@@ -1,0 +1,29 @@
+
+# Virtual environments and secrets
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+__pycache__/
+.pytest_cache/
+
+# Vendor input and confidential case materials
+Meridian_Vendor_Input.xlsx
+Case Study Brief.pdf
+
+# Cached vendor data, evidence and generated results
+cache/
+cache_*/
+outputs/
+data/labels*.csv
+data/candidates*.jsonl
+data/candidate_review*.csv
+data/candidate_review*.md
+
+# Local ML artifacts
+m4_intel/models/
+*.joblib
+*.pkl
+*.pt
+*.bin

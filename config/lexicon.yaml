@@ -1,0 +1,80 @@
+# Configurable candidate-extraction terminology. These matches identify text to
+# review; they do not establish that a vendor actually uses AI.
+providers:
+  - OpenAI
+  - Azure OpenAI
+  - Anthropic
+  - Claude
+  - Google Vertex AI
+  - Gemini
+  - AWS Bedrock
+  - Amazon Bedrock
+  - SageMaker
+  - Hugging Face
+  - Cohere
+  - Mistral
+  - Databricks
+frameworks:
+  - TensorFlow
+  - PyTorch
+  - scikit-learn
+  - LangChain
+  - LlamaIndex
+  - MLflow
+  - Kubeflow
+techniques:
+  - artificial intelligence
+  - machine learning
+  - large language model
+  - LLM
+  - generative AI
+  - GenAI
+  - retrieval-augmented generation
+  - RAG
+  - embeddings
+  - fine-tuning
+  - natural language processing
+  - NLP
+  - computer vision
+  - anomaly detection
+  - predictive model
+  - neural network
+  - agentic AI
+  - copilot
+  - intelligent document processing
+  - AI
+  - artificial intelligence
+  - generative model
+  - language model
+  - large language models
+  - AI agent
+  - AI agents
+use_cases:
+  - fraud detection
+  - transaction scoring
+  - document classification
+  - chatbot
+  - virtual assistant
+  - summarisation
+  - summarization
+  - auto-drafting
+  - forecasting
+hype_terms:
+  - AI-powered
+  - next-generation
+  - revolutionary
+  - cutting-edge
+  - AI assistant
+  - generative search
+  - recommendation system
+  - speech recognition
+  - image recognition
+future_oriented_terms:
+  - will
+  - plans to
+  - planning to
+  - exploring
+  - may
+  - roadmap
+  - intends to
+  - future
