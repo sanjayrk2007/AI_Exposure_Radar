@@ -7,6 +7,7 @@ from __future__ import annotations
 import argparse
 import csv
 import hashlib
+import io
 import json
 import re
 import sys
@@ -40,6 +41,12 @@ MIN_VENDORS_PER_CLASS = 2
 # model selection uses only folds with both classes and requires several of them.
 MIN_BOTH_CLASS_FOLDS = 3
 CALIBRATION_BINS = 5
+# Plan Appendix E: a more complex model must beat the simpler rung by a margin (3 macro-F1 points).
+MIN_MACRO_F1_MARGIN = 0.03
+# Evaluation can run on a small pilot sample, but a learned model is only *deployed* (artifact
+# written, probability multiplied into evidence scores) once the plan's labelling target is met.
+# Draft/config value taken from the plan's "at least 300 labelled sentences"; lower it deliberately.
+MIN_ROWS_TO_DEPLOY = 300
 MODEL_FILENAME = "tfidf_logistic_regression.joblib"
 MANIFEST_FILENAME = "model_manifest.json"
 SYNTHETIC_LABELS_PATH = ROOT / "data" / "synthetic_labels.csv"
@@ -68,7 +75,7 @@ def load_labels(path: str | Path = DEFAULT_LABELS) -> list[dict[str, str]]:
         if reader.fieldnames is None or not set(CSV_COLUMNS).issubset(reader.fieldnames):
             raise ValueError(f"{source} must contain columns: {', '.join(CSV_COLUMNS)}")
         rows: list[dict[str, str]] = []
-        seen_ids: set[tuple[str, str, str]] = set()
+        seen_ids: dict[tuple[str, str, str], tuple[str, int]] = {}
         for line_number, row in enumerate(reader, start=2):
             vendor = (row.get("vendor_id") or "").strip()
             doc_id = (row.get("doc_id") or "").strip()
@@ -85,9 +92,16 @@ def load_labels(path: str | Path = DEFAULT_LABELS) -> list[dict[str, str]]:
             if label not in {"TECHNICAL", "VAGUE", "EXCLUDE", "1", "0"}:
                 raise ValueError(f"Invalid label {label!r} at {source}:{line_number}")
             identity = (vendor, doc_id, re.sub(r"\s+", " ", sentence).casefold())
+            canonical = "TECHNICAL" if label in {"TECHNICAL", "1"} else "VAGUE" if label in {"VAGUE", "0"} else "EXCLUDE"
             if identity in seen_ids:
+                first_label, first_line = seen_ids[identity]
+                if first_label != canonical:
+                    # Never silently drop one of two human decisions: the reviewers must resolve it.
+                    raise ValueError(
+                        f"Conflicting labels for the same sentence at {source}:{first_line} ({first_label}) "
+                        f"and {source}:{line_number} ({canonical}); resolve the conflict by hand")
                 continue
-            seen_ids.add(identity)
+            seen_ids[identity] = (canonical, line_number)
             if label == "EXCLUDE":
                 continue
             rows.append({"vendor_id": vendor, "doc_id": doc_id, "sentence": sentence,
@@ -296,9 +310,17 @@ def make_real_report(result: dict[str, Any]) -> str:
         lines += ["", "## Selection decision", "", f"- Selected: `{decision['selected']}`", f"- {decision['rule']}",
                   f"- Mean macro-F1 (both-class folds): rule {decision['rule_macro_f1_mean_both_class_folds']}, "
                   f"TF-IDF {decision['tfidf_macro_f1_mean_both_class_folds']}; both-class folds required: "
-                  f"{decision['both_class_folds_required']} (rule {decision['both_class_folds_rule']}, TF-IDF {decision['both_class_folds_tfidf']})."]
+                  f"{decision['both_class_folds_required']} (rule {decision['both_class_folds_rule']}, TF-IDF {decision['both_class_folds_tfidf']}).",
+                  f"- Evaluation favours TF-IDF: {decision.get('evaluation_favours_tfidf')}; "
+                  f"deployment blocked: {decision.get('deployment_blocked_reason') or 'no'}."]
     lines += ["", "## Limitations", ""] + [f"- {item}" for item in result.get("limitations", [])] + [""]
     return "\n".join(lines)
+
+
+def _remove_artifacts(output: Path) -> None:
+    """Delete any saved model so a run that did not select one can never leave a stale model in use."""
+    for stale in (output / MODEL_FILENAME, output / MANIFEST_FILENAME):
+        stale.unlink(missing_ok=True)
 
 
 def _write_outputs(result: dict[str, Any], metrics_file: Path, output: Path) -> None:
@@ -344,6 +366,7 @@ def run_training(labels_path: str | Path = DEFAULT_LABELS,
         "limitations": [],
     }
     if len(rows) == 0:
+        _remove_artifacts(output)
         result["status"] = "awaiting_manual_labels"
         result["limitations"].append("No reviewed cached-document sentences were present in labels.csv; no model was trained and no performance metrics are available.")
         result["limitations"].append("Collect sentences from actual cached vendor documents and manually label them. Do not fabricate rows to reach 300.")
@@ -392,6 +415,7 @@ def run_training(labels_path: str | Path = DEFAULT_LABELS,
     }
 
     if readiness_reasons:
+        _remove_artifacts(output)
         result["status"] = "INSUFFICIENT_DATA"
         result["limitations"].extend(readiness_reasons)
         result["limitations"].append(
@@ -412,39 +436,54 @@ def run_training(labels_path: str | Path = DEFAULT_LABELS,
     if any(len(set(int(r["label"]) for r in rows if r["vendor_id"] != vendor)) < 2 for vendor in EXPECTED_VENDORS):
         result["limitations"].append("At least one training fold lacks both classes; TF-IDF metrics may be missing for that fold.")
 
-    # A learned model is selected only when its mean fold macro-F1 (all folds, and folds with
-    # both classes, of which at least MIN_BOTH_CLASS_FOLDS are required) is at least the rule baseline.
-    # No threshold/model tuning is done against held-out labels.
-    selected = "rule_based_fallback"
+    # Evaluation and deployment are separate decisions. The learned model must (a) be evaluable on all
+    # six folds, (b) have enough both-class folds, and (c) beat the rule baseline by the plan's margin.
+    # Even then it is only deployed once enough reviewed rows exist. No tuning uses held-out labels.
     rule_mean = rule_summary.get("macro_f1_mean_fold")
     tfidf_mean = tfidf_summary.get("macro_f1_mean_fold")
-    if (tfidf_summary.get("status") == "evaluated" and rule_mean is not None and tfidf_mean is not None
-            and rule_summary.get("folds_with_metrics") == len(EXPECTED_VENDORS)
-            and tfidf_summary.get("folds_with_metrics") == len(EXPECTED_VENDORS)
-            and rule_summary.get("both_class_folds", 0) >= MIN_BOTH_CLASS_FOLDS
-            and tfidf_summary.get("both_class_folds", 0) >= MIN_BOTH_CLASS_FOLDS
-            and tfidf_summary["macro_f1_mean_both_class_folds"] >= rule_summary["macro_f1_mean_both_class_folds"]
-            and tfidf_mean >= rule_mean):
+    rule_both = rule_summary.get("macro_f1_mean_both_class_folds")
+    tfidf_both = tfidf_summary.get("macro_f1_mean_both_class_folds")
+    evaluation_favours_tfidf = bool(
+        tfidf_summary.get("status") == "evaluated" and rule_mean is not None and tfidf_mean is not None
+        and rule_both is not None and tfidf_both is not None
+        and rule_summary.get("folds_with_metrics") == len(EXPECTED_VENDORS)
+        and tfidf_summary.get("folds_with_metrics") == len(EXPECTED_VENDORS)
+        and rule_summary.get("both_class_folds", 0) >= MIN_BOTH_CLASS_FOLDS
+        and tfidf_summary.get("both_class_folds", 0) >= MIN_BOTH_CLASS_FOLDS
+        and tfidf_both >= rule_both + MIN_MACRO_F1_MARGIN - 1e-9
+        and tfidf_mean >= rule_mean)
+    deployment_blocked = None
+    if evaluation_favours_tfidf and len(rows) < MIN_ROWS_TO_DEPLOY:
+        deployment_blocked = (f"Evaluation favours TF-IDF, but only {len(rows)} reviewed rows exist; "
+                              f"at least {MIN_ROWS_TO_DEPLOY} are required before a learned model is deployed.")
+    selected = "rule_based_fallback"
+    if evaluation_favours_tfidf and deployment_blocked is None:
         selected = "tfidf_logistic_regression"
         final_model = make_tfidf_model()
         final_model.fit([r["sentence"] for r in rows], [int(r["label"]) for r in rows])
         save_model_artifact(final_model, output, n_rows=len(rows), labels_sha256=_file_sha256(labels_path))
     else:
-        # Never leave a stale artifact from an earlier run that this run did not select.
-        for stale in (output / MODEL_FILENAME, output / MANIFEST_FILENAME):
-            stale.unlink(missing_ok=True)
+        _remove_artifacts(output)
     result["selection_decision"] = {
         "selected": selected,
+        "evaluation_favours_tfidf": evaluation_favours_tfidf,
+        "deployment_blocked_reason": deployment_blocked,
+        "min_rows_to_deploy": MIN_ROWS_TO_DEPLOY,
+        "required_margin_over_rule": MIN_MACRO_F1_MARGIN,
         "rule_macro_f1_mean_fold": rule_mean, "tfidf_macro_f1_mean_fold": tfidf_mean,
-        "rule_macro_f1_mean_both_class_folds": rule_summary.get("macro_f1_mean_both_class_folds"),
-        "tfidf_macro_f1_mean_both_class_folds": tfidf_summary.get("macro_f1_mean_both_class_folds"),
+        "rule_macro_f1_mean_both_class_folds": rule_both,
+        "tfidf_macro_f1_mean_both_class_folds": tfidf_both,
         "both_class_folds_required": MIN_BOTH_CLASS_FOLDS,
         "both_class_folds_rule": rule_summary.get("both_class_folds", 0),
         "both_class_folds_tfidf": tfidf_summary.get("both_class_folds", 0),
-        "rule": "TF-IDF is selected only if all six folds are evaluable, enough folds contain both classes, and its mean macro-F1 (all folds and both-class folds) is at least the rule baseline.",
+        "rule": (f"TF-IDF is selected only if all six folds are evaluable, at least {MIN_BOTH_CLASS_FOLDS} folds contain both "
+                 f"classes, its mean macro-F1 on both-class folds beats the rule baseline by at least {MIN_MACRO_F1_MARGIN}, "
+                 f"and at least {MIN_ROWS_TO_DEPLOY} reviewed rows exist. Otherwise the rule score is used."),
     }
+    if deployment_blocked:
+        result["limitations"].append(deployment_blocked)
     result["model_name"] = selected
-    result["status"] = "evaluated_baselines_model_selected"
+    result["status"] = "evaluated_model_selected" if selected != "rule_based_fallback" else "evaluated_rule_fallback_retained"
     result["limitations"].append("Sentence-embedding and fine-tuned encoder baselines were not run; consider them only if TF-IDF clearly underperforms on a sufficiently large reviewed sample.")
     _write_outputs(result, metrics_file, output)
     return result
@@ -465,28 +504,39 @@ def save_model_artifact(model: Pipeline, output_dir: str | Path, *, n_rows: int,
     model_path = output / MODEL_FILENAME
     joblib.dump(model, model_path)
     manifest = {"model_name": "tfidf_logistic_regression", "scikit_learn_version": sklearn.__version__,
-                "seed": SEED, "n_training_rows": n_rows, "labels_sha256": labels_sha256}
+                "seed": SEED, "n_training_rows": n_rows, "labels_sha256": labels_sha256,
+                "model_sha256": hashlib.sha256(model_path.read_bytes()).hexdigest()}
     (output / MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return model_path
 
 
-def _manifest_compatible(model_dir: Path) -> bool:
-    """A missing manifest is tolerated (older artifacts); a mismatched library version is not."""
-    manifest_path = model_dir / MANIFEST_FILENAME
-    if not manifest_path.is_file():
-        return True
+def _load_manifest(model_dir: Path) -> dict[str, Any] | None:
+    """Return the manifest only if it exists, parses, matches this scikit-learn and names a model hash.
+
+    A missing or malformed manifest means the artifact's origin is unknown, so it is not used.
+    """
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        return isinstance(manifest, dict) and manifest.get("scikit_learn_version") == sklearn.__version__
+        manifest = json.loads((model_dir / MANIFEST_FILENAME).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return False
+        return None
+    if (isinstance(manifest, dict) and manifest.get("scikit_learn_version") == sklearn.__version__
+            and isinstance(manifest.get("model_sha256"), str) and manifest["model_sha256"]):
+        return manifest
+    return None
+
+
+def _manifest_compatible(model_dir: Path) -> bool:
+    return _load_manifest(Path(model_dir)) is not None
 
 
 @lru_cache(maxsize=4)
-def _load_model_cached(path: str, mtime_ns: int, size: int) -> Pipeline | None:
-    """Load once per file version. Returns None for any unusable artifact."""
+def _load_model_cached(path: str, mtime_ns: int, size: int, expected_sha256: str) -> Pipeline | None:
+    """Load once per file version. Returns None for any unusable or hash-mismatched artifact."""
     try:
-        model = joblib.load(path)
+        payload = Path(path).read_bytes()
+        if hashlib.sha256(payload).hexdigest() != expected_sha256:
+            return None
+        model = joblib.load(io.BytesIO(payload))
         classes = list(model.named_steps["classifier"].classes_)
         if 1 in classes and callable(getattr(model, "predict_proba", None)):
             return model
@@ -506,10 +556,11 @@ def score_specificity_with_method(sentence: str, model_dir: str | Path = DEFAULT
         raise TypeError("sentence must be a string")
     model_dir = Path(model_dir)
     model_path = model_dir / MODEL_FILENAME
-    if sentence.strip() and model_path.is_file() and _manifest_compatible(model_dir):
+    manifest = _load_manifest(model_dir) if sentence.strip() and model_path.is_file() else None
+    if manifest is not None:
         try:
             stat = model_path.stat()
-            model = _load_model_cached(str(model_path), stat.st_mtime_ns, stat.st_size)
+            model = _load_model_cached(str(model_path), stat.st_mtime_ns, stat.st_size, manifest["model_sha256"])
             if model is not None:
                 positive_index = list(model.named_steps["classifier"].classes_).index(1)
                 probability = float(model.predict_proba([sentence])[0][positive_index])

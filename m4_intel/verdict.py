@@ -16,6 +16,15 @@ from radar.contracts.models import VendorVerdict
 _USABLE_REPORT_STATUSES = {"OK"}
 _TAG_RANK = {"NONE": 0, "MARKETING_ONLY": 1, "PROBABLE": 2, "STRONG": 3, "CONFIRMED": 4}
 _ALLOWED_VERDICTS = {"Yes", "No", "Inconclusive"}
+POSSIBLE_AI_SPECIFICITY = 0.5
+
+
+def _possible_ai(signal: object) -> bool:
+    specificity = _field(signal, "specificity", 0.0)
+    numeric = specificity if isinstance(specificity, (int, float)) and not isinstance(specificity, bool) else 0.0
+    providers = _field(signal, "providers", [])
+    named = isinstance(providers, Sequence) and not isinstance(providers, (str, bytes)) and bool(providers)
+    return numeric >= POSSIBLE_AI_SPECIFICITY or named
 
 
 def _field(value: object, name: str, default: Any = None) -> Any:
@@ -211,12 +220,17 @@ def generate_verdict(
     if _strong_evidence(verified):
         verdict = "Yes"
         reasons = ["Verified evidence met the configured draft threshold for AI-use signals."]
-    elif coverage >= 0.7 and not any(_TAG_RANK.get(_field(signal, "tag"), 0) >= 2 for signal in verified):
+    elif (coverage >= 0.7 and not any(_TAG_RANK.get(_field(signal, "tag"), 0) >= 2 for signal in verified)
+          and not any(_possible_ai(signal) for signal in verified)):
         verdict = "No"
         reasons = ["Coverage met the 0.7 threshold and no verified signal exceeded MARKETING_ONLY; this is a coverage-qualified result, not proof from missing evidence."]
     else:
         verdict = "Inconclusive"
         reasons = ["Available verified evidence did not meet the draft threshold for Yes or the coverage requirement for No."]
+
+    if verdict != "No" and any(_possible_ai(signal) for signal in verified) and not _strong_evidence(verified):
+        reasons.append("At least one verified signal indicates possible AI use (provider named or specificity at or above "
+                       f"{POSSIBLE_AI_SPECIFICITY}); a No verdict is not allowed.")
 
     if coverage < 0.7:
         reasons.append(f"Coverage was {coverage:.3f}, below the 0.700 threshold required for No; missing evidence is not treated as evidence of absence.")

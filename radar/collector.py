@@ -1,4 +1,3 @@
-
 """Polite, bounded collection of public vendor webpages.
 
 This module stores evidence locally. Collection failures are not negative
@@ -14,11 +13,12 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urldefrag, urljoin, urlparse, urlunparse
+from urllib.robotparser import RobotFileParser
 
 import requests
 from bs4 import BeautifulSoup
 
-from radar.contracts.models import Document
+from radar.contracts.models import Document, SourceReport
 from radar.input_inspection import read_vendor_profiles
 
 USER_AGENT = (
@@ -30,6 +30,21 @@ RELEVANT_LINK_TERMS = (
     "innovation", "product", "platform", "solution", "automation",
     "data", "security", "research", "documentation",
 )
+MIN_DELAY_SECONDS = 1.5
+PLANNED_SOURCE_TYPES = ("TRUST", "DOCS", "WEB")
+DEFAULT_PLANNED_SOURCES = PLANNED_SOURCE_TYPES
+PROBE_PATHS = (
+    "/trust", "/security", "/subprocessors", "/privacy", "/ai",
+    "/responsible-ai", "/developers", "/docs", "/api", "/legal",
+)
+_TRUST_PATH = re.compile(
+    r"(?:^|/)(?:trust|security|privacy|legal|compliance|subprocessors?|"
+    r"sub-processors?|responsible-ai|ai-policy|ai-principles|dpa|gdpr)(?:[/\-_.]|$)"
+)
+_DOCS_PATH = re.compile(
+    r"(?:^|/)(?:docs?|documentation|developers?|api|apis|reference)(?:[/\-_.]|$)"
+)
+_BLOCKED_HTTP = {401, 403, 429}
 SKIPPED_EXTENSIONS = (
     ".pdf", ".zip", ".png", ".jpg", ".jpeg", ".gif", ".svg",
     ".mp4", ".mp3", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
@@ -70,9 +85,111 @@ def _canonical_url(url: str) -> str | None:
     ))
 
 
+def _base_host(hostname: str) -> str:
+    host = hostname.lower().rstrip(".")
+    return host[4:] if host.startswith("www.") else host
+
+
 def _same_hostname(url: str, hostname: str) -> bool:
-    parsed = urlparse(url)
-    return (parsed.hostname or "").lower().rstrip(".") == hostname.lower().rstrip(".")
+    candidate = _base_host(urlparse(url).hostname or "")
+    base = _base_host(hostname)
+    return bool(candidate) and (candidate == base or candidate.endswith("." + base))
+
+
+def classify_source_type(url: str) -> str:
+    """Classify a page by URL path only: TRUST, DOCS or WEB."""
+    path = urlparse(url).path.lower()
+    if _TRUST_PATH.search(path):
+        return "TRUST"
+    if _DOCS_PATH.search(path):
+        return "DOCS"
+    return "WEB"
+
+
+class RobotsPolicy:
+    """robots.txt decision for one origin; unreachable robots.txt blocks collection."""
+
+    def __init__(self, origin: str, client, timeout_seconds: float, user_agent: str = USER_AGENT):
+        self.origin = origin
+        self.user_agent = user_agent
+        self.parser = RobotFileParser()
+        self.allow_all = False
+        self.block_all = False
+        self.note = ""
+        url = origin.rstrip("/") + "/robots.txt"
+        try:
+            response = client.get(url, timeout=timeout_seconds, allow_redirects=True)
+        except requests.RequestException as exc:
+            self.block_all = True
+            self.note = f"robots.txt unreachable: {exc}"
+            return
+        status = response.status_code
+        if status == 200:
+            self.parser.parse(response.text.splitlines())
+        elif 400 <= status < 500:
+            self.allow_all = True
+            self.note = f"robots.txt returned {status}; treated as no restrictions"
+        else:
+            self.block_all = True
+            self.note = f"robots.txt returned {status}; collection not attempted"
+
+    def allowed(self, url: str) -> bool:
+        if self.block_all:
+            return False
+        if self.allow_all:
+            return True
+        return self.parser.can_fetch(self.user_agent, url)
+
+    def crawl_delay(self) -> float:
+        if self.block_all or self.allow_all:
+            return 0.0
+        delay = self.parser.crawl_delay(self.user_agent)
+        return float(delay) if delay else 0.0
+
+
+def build_source_reports(
+    vendor_id: str,
+    documents: list[Document],
+    events: list[dict],
+    planned: tuple[str, ...] = PLANNED_SOURCE_TYPES,
+) -> list[SourceReport]:
+    """One SourceReport per planned family, explaining why a family has no documents."""
+    reports: list[SourceReport] = []
+    for source_type in planned:
+        count = sum(1 for doc in documents if doc.source_type == source_type)
+        if count:
+            reports.append(SourceReport(vendor_id, source_type, "OK", count, f"{count} page(s) collected"))
+            continue
+        relevant = [
+            event for event in events
+            if event.get("vendor_id") == vendor_id
+            and event.get("source_type") in (source_type, None)
+        ]
+        blocked = [
+            event for event in relevant
+            if event["status"] in {"ROBOTS_DISALLOWED", "ROBOTS_UNREACHABLE"}
+            or (event["status"] == "HTTP_ERROR" and event.get("http_status") in _BLOCKED_HTTP)
+        ]
+        failed = [
+            event for event in relevant
+            if event["status"] in {"REQUEST_ERROR", "HTTP_ERROR", "REDIRECT_OUTSIDE_HOST", "COLLECTION_ERROR"}
+            and event not in blocked
+        ]
+        empty = [event for event in relevant if event["status"] in {"EMPTY_TEXT", "SKIPPED_CONTENT_TYPE"}]
+        if blocked:
+            note = "; ".join(sorted({str(e.get("note") or e["status"]) for e in blocked}))
+            reports.append(SourceReport(vendor_id, source_type, "BLOCKED", 0, note))
+        elif failed:
+            note = "; ".join(sorted({str(e.get("note") or e["status"]) for e in failed}))
+            reports.append(SourceReport(vendor_id, source_type, "ERROR", 0, note))
+        elif empty:
+            reports.append(SourceReport(vendor_id, source_type, "EMPTY", 0, "Pages returned no usable text"))
+        else:
+            reports.append(SourceReport(
+                vendor_id, source_type, "EMPTY", 0,
+                "No page of this type was found; this is not evidence of no AI usage",
+            ))
+    return reports
 
 
 def _extract_page(html: str, page_url: str, hostname: str):
@@ -141,9 +258,9 @@ def _extract_page(html: str, page_url: str, hostname: str):
     return title, "\n".join(blocks), links
 
 
-def _document_id(vendor_id: str, url: str) -> str:
+def _document_id(vendor_id: str, url: str, source_type: str = "WEB") -> str:
     suffix = hashlib.sha256(url.encode("utf-8")).hexdigest()[:12]
-    return f"{vendor_id}-WEB-{suffix}"
+    return f"{vendor_id}-{source_type}-{suffix}"
 
 
 def collect_vendor_pages(
@@ -151,15 +268,22 @@ def collect_vendor_pages(
     output_dir: str | Path,
     *,
     max_pages: int = 4,
-    delay_seconds: float = 1.0,
+    delay_seconds: float = MIN_DELAY_SECONDS,
     timeout_seconds: float = 15.0,
     session: requests.Session | None = None,
+    respect_robots: bool = True,
+    probe_paths: bool = False,
 ) -> tuple[list[Document], list[dict]]:
-    """Collect homepage plus a few relevant same-host pages for one vendor."""
+    """Collect homepage plus a few relevant same-host pages for one vendor.
+
+    Pages are classified TRUST/DOCS/WEB by URL path. robots.txt is honoured and
+    pages it disallows are never fetched. With probe_paths, well-known trust and
+    documentation paths are tried after the homepage.
+    """
     if max_pages < 1:
         raise ValueError("max_pages must be at least 1")
-    if delay_seconds < 0:
-        raise ValueError("delay_seconds cannot be negative")
+    if delay_seconds < MIN_DELAY_SECONDS:
+        raise ValueError(f"delay_seconds must be at least {MIN_DELAY_SECONDS}")
 
     vendor_id = str(profile.get("Vendor ID") or "").strip()
     vendor_name = str(profile.get("Vendor Name") or "").strip()
@@ -188,13 +312,40 @@ def collect_vendor_pages(
     queued = {start_url}
     visited: set[str] = set()
     last_request_at: float | None = None
+    request_budget = max_pages * 4 + len(PROBE_PATHS)
+    requests_made = 0
+    robots: RobotsPolicy | None = None
 
     try:
-        while queue and len(documents) < max_pages:
+        if respect_robots:
+            robots = RobotsPolicy(start_url, client, timeout_seconds)
+            if robots.block_all:
+                events.append({
+                    "vendor_id": vendor_id, "url": start_url, "source_type": None,
+                    "status": "ROBOTS_UNREACHABLE", "note": robots.note,
+                })
+                return documents, events
+            delay_seconds = max(delay_seconds, robots.crawl_delay())
+            last_request_at = time.monotonic()
+        if probe_paths:
+            for path in PROBE_PATHS:
+                probe = urlunparse(("https", urlparse(start_url).netloc, path, "", "", ""))
+                if probe not in queued:
+                    queue.append(probe)
+                    queued.add(probe)
+
+        while queue and len(documents) < max_pages and requests_made < request_budget:
             url = queue.pop(0)
             if url in visited:
                 continue
             visited.add(url)
+
+            if robots is not None and not robots.allowed(url):
+                events.append({
+                    "vendor_id": vendor_id, "url": url, "status": "ROBOTS_DISALLOWED",
+                    "note": "Disallowed by robots.txt; page not requested",
+                })
+                continue
 
             if last_request_at is not None:
                 wait = delay_seconds - (time.monotonic() - last_request_at)
@@ -202,6 +353,7 @@ def collect_vendor_pages(
                     time.sleep(wait)
 
             try:
+                requests_made += 1
                 response = client.get(
                     url, timeout=timeout_seconds, allow_redirects=True
                 )
@@ -222,12 +374,20 @@ def collect_vendor_pages(
                 })
                 continue
 
+            if robots is not None and not robots.allowed(final_url):
+                events.append({
+                    "vendor_id": vendor_id, "url": final_url, "status": "ROBOTS_DISALLOWED",
+                    "note": "Redirect target disallowed by robots.txt; page not stored",
+                })
+                continue
+
             content_type = response.headers.get("Content-Type", "").lower()
             if response.status_code != 200:
                 events.append({
                     "vendor_id": vendor_id, "url": final_url,
-                    "status": "HTTP_ERROR", "http_status": response.status_code,
-                    "note": "Non-200 response; page not stored",
+                    "status": "NOT_FOUND" if response.status_code == 404 else "HTTP_ERROR",
+                    "http_status": response.status_code,
+                    "note": f"HTTP {response.status_code}; page not stored",
                 })
                 continue
             if "text/html" not in content_type and "application/xhtml+xml" not in content_type:
@@ -250,7 +410,10 @@ def collect_vendor_pages(
                 })
                 continue
 
-            doc_id = _document_id(vendor_id, final_url)
+            source_type = classify_source_type(final_url)
+            doc_id = _document_id(vendor_id, final_url, source_type)
+            if any(existing.doc_id == doc_id for existing in documents):
+                continue
             content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
             snapshot_path = snapshot_dir / f"{doc_id}.txt"
             snapshot_path.write_text(text + "\n", encoding="utf-8")
@@ -258,7 +421,7 @@ def collect_vendor_pages(
             document = Document(
                 doc_id=doc_id,
                 vendor_id=vendor_id,
-                source_type="WEB",
+                source_type=source_type,
                 url=final_url,
                 fetched_at=datetime.now(timezone.utc).isoformat(),
                 http_status=response.status_code,
@@ -276,12 +439,12 @@ def collect_vendor_pages(
             documents.append(document)
             events.append({
                 "vendor_id": vendor_id, "url": final_url,
-                "doc_id": doc_id, "status": "FETCHED",
+                "doc_id": doc_id, "source_type": source_type, "status": "FETCHED",
                 "http_status": response.status_code,
                 "characters": len(text),
             })
 
-            if len(documents) + len(visited) <= max_pages * 3:
+            if len(documents) < max_pages:
                 candidates = []
                 for link_url, label in links:
                     if link_url in queued or link_url in visited:
@@ -297,6 +460,9 @@ def collect_vendor_pages(
         if own_session:
             client.close()
 
+    for event in events:
+        if "source_type" not in event:
+            event["source_type"] = classify_source_type(event["url"]) if event.get("url") else None
     return documents, events
 
 
@@ -304,16 +470,19 @@ def collect_workbook(
     workbook_path: str | Path,
     output_dir: str | Path = "cache",
     *,
-    max_pages: int = 4,
-    delay_seconds: float = 1.0,
+    max_pages: int = 8,
+    delay_seconds: float = MIN_DELAY_SECONDS,
 ) -> dict:
-    """Collect each real vendor, writing a JSONL manifest and event log."""
+    """Collect each real vendor, writing a JSONL manifest, event log and source reports."""
+    if delay_seconds < MIN_DELAY_SECONDS:
+        raise ValueError(f"delay_seconds must be at least {MIN_DELAY_SECONDS}")
     root = Path(output_dir)
     root.mkdir(parents=True, exist_ok=True)
 
     profiles = read_vendor_profiles(workbook_path)
     all_documents: list[Document] = []
     all_events: list[dict] = []
+    all_reports: list[SourceReport] = []
 
     for profile in profiles:
         vendor_id = str(profile.get("Vendor ID") or "").strip()
@@ -324,7 +493,9 @@ def collect_workbook(
                 profile, root,
                 max_pages=max_pages,
                 delay_seconds=delay_seconds,
+                probe_paths=True,
             )
+            all_reports.extend(build_source_reports(vendor_id, docs, events))
             all_documents.extend(docs)
             all_events.extend(events)
             if not docs and not events:
@@ -362,12 +533,18 @@ def collect_workbook(
         for event in all_events:
             handle.write(json.dumps(event, ensure_ascii=False) + "\n")
 
+    report_log = root / "source_reports.jsonl"
+    with report_log.open("w", encoding="utf-8") as handle:
+        for report in all_reports:
+            handle.write(json.dumps(report.__dict__, ensure_ascii=False) + "\n")
+
     summary = {
         "vendors_in_input": len(profiles),
         "documents_saved": len(all_documents),
         "events_logged": len(all_events),
         "manifest": str(manifest),
         "event_log": str(event_log),
+        "source_reports": str(report_log),
         "note": "Fetch failures and missing pages are not evidence of no AI usage.",
     }
     (root / "collection_summary.json").write_text(
@@ -382,8 +559,8 @@ def main() -> None:
     )
     parser.add_argument("--workbook", required=True, help="Path to vendor input XLSX")
     parser.add_argument("--output-dir", default="cache", help="Local output directory")
-    parser.add_argument("--max-pages", type=int, default=4, help="Pages per vendor")
-    parser.add_argument("--delay", type=float, default=1.0, help="Seconds between requests")
+    parser.add_argument("--max-pages", type=int, default=8, help="Pages per vendor")
+    parser.add_argument("--delay", type=float, default=MIN_DELAY_SECONDS, help="Seconds between requests (minimum 1.5)")
     args = parser.parse_args()
 
     summary = collect_workbook(

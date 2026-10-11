@@ -9,10 +9,11 @@ def doc(doc_id="D1", source_type="DOCS", text="OpenAI uses an API for fraud dete
                     "2026-01-01T00:00:00Z", 200, "hash", "Mock", text, "", {})
 
 
-def signal(signal_id, source_type, tag, *, verified=True, vendor_id="V-MOCK", providers=None, category="fraud_detection"):
+def signal(signal_id, source_type, tag, *, verified=True, vendor_id="V-MOCK", providers=None, category="fraud_detection",
+           specificity=0.8):
     return Signal(signal_id, vendor_id, "D-" + signal_id, source_type,
                   "https://example.invalid/" + signal_id, "mock excerpt", 0, 12,
-                  category, providers or [], 0.8, 4.0, 3.2, tag, verified, "RULE")
+                  category, providers or [], specificity, 4.0, 3.2, tag, verified, "RULE")
 
 
 def report(source_type, status="OK"):
@@ -73,9 +74,24 @@ def test_single_strong_does_not_mean_yes():
 def test_no_requires_high_coverage_and_no_probable_or_better_signal():
     docs = [doc("D1", "DOCS"), doc("D2", "TRUST"), doc("D3", "WEB")]
     result = verdict(["DOCS", "TRUST", "WEB"], docs,
-                     [signal("S1", "WEB", "MARKETING_ONLY")])
+                     [signal("S1", "WEB", "MARKETING_ONLY", specificity=0.1)])
     assert result.ai_usage == "No"
     assert result.coverage == 1.0
+
+
+def test_no_is_blocked_when_marketing_tagged_signal_is_specific():
+    docs = [doc("D1", "DOCS"), doc("D2", "TRUST"), doc("D3", "WEB")]
+    result = verdict(["DOCS", "TRUST", "WEB"], docs,
+                     [signal("S1", "WEB", "MARKETING_ONLY", specificity=0.9)])
+    assert result.ai_usage == "Inconclusive"
+    assert any("possible AI use" in reason for reason in result.reasons)
+
+
+def test_no_is_blocked_when_marketing_tagged_signal_names_a_provider():
+    docs = [doc("D1", "DOCS"), doc("D2", "TRUST"), doc("D3", "WEB")]
+    result = verdict(["DOCS", "TRUST", "WEB"], docs,
+                     [signal("S1", "WEB", "MARKETING_ONLY", specificity=0.1, providers=["OpenAI"])])
+    assert result.ai_usage == "Inconclusive"
 
 
 def test_low_coverage_never_means_no():

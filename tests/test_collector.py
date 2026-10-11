@@ -10,6 +10,13 @@ from radar.collector import (
 )
 
 
+@pytest.fixture(autouse=True)
+def recorded_sleep(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr("radar.collector.time.sleep", sleeps.append)
+    return sleeps
+
+
 class FakeResponse:
     def __init__(self, url, html, status=200, content_type="text/html"):
         self.url = url
@@ -25,6 +32,8 @@ class FakeSession:
         self.requested = []
 
     def get(self, url, **kwargs):
+        if url.endswith("/robots.txt") and url not in self.responses:
+            return FakeResponse(url, "", status=404, content_type="text/plain")
         self.requested.append(url)
         response = self.responses.get(url)
         if response is None:
@@ -73,7 +82,7 @@ def test_collects_homepage_and_relevant_same_host_page(tmp_path):
 
     docs, events = collect_vendor_pages(
         profile(), tmp_path, max_pages=2,
-        delay_seconds=0, session=session,
+        session=session,
     )
 
     assert len(docs) == 2
@@ -91,7 +100,6 @@ def test_rejects_worked_example(tmp_path):
         collect_vendor_pages(
             profile(vendor_id="V-000"),
             tmp_path,
-            delay_seconds=0,
             session=FakeSession({}),
         )
 
@@ -103,7 +111,7 @@ def test_http_error_is_logged_without_document(tmp_path):
     })
 
     docs, events = collect_vendor_pages(
-        profile(), tmp_path, delay_seconds=0, session=session,
+        profile(), tmp_path, session=session,
     )
 
     assert docs == []

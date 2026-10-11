@@ -72,3 +72,9 @@ def test_classifier_rule_disagreement_is_flagged_for_review(monkeypatch):
     result = analyse_detailed("V-001", [doc("D1", "WEB", HYPE)], planned_sources=["WEB"])
     assert result.signals[0].method == "ML" and result.signals[0].specificity == 0.95
     assert result.signals[0].signal_id in result.ambiguous
+
+
+def test_no_plan_and_no_reports_gives_zero_coverage_and_never_no():
+    """Without a plan or reports the planned sources are unknown; coverage must not default to 1.0."""
+    _, verdict = run([doc("D1", "WEB", HYPE)])
+    assert verdict.coverage == 0.0 and verdict.ai_usage == "Inconclusive"

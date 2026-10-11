@@ -93,3 +93,20 @@ No cached vendor documents are currently present in this workspace, so no candid
 ### Reproducible real-label reporting
 
 `python -m m4_intel.train_specificity` writes `metrics.json`, `real_evaluation_report.md` and, only when TF-IDF is selected, `tfidf_logistic_regression.joblib` plus `model_manifest.json` (scikit-learn version, seed, row count, labels hash) into `m4_intel/models/specificity_v1/` (git-ignored). `selection_decision` in the metrics records why a model was or was not chosen. Inference (`score_specificity`, `analyse`) loads the artifact once per file version and falls back to the rule score if the file is missing, corrupt, the wrong object, or was built with a different scikit-learn version. A stale artifact is deleted when a run does not select TF-IDF. `load_labels` rejects synthetic rows (`SYN*` doc ids, a `provenance` column marked synthetic, or `data/synthetic_labels.csv` itself). The synthetic report (`experiment_report.md`) stays separate and is never used for selection.
+
+
+## End-to-end demo (M4 scope)
+
+```bash
+python -m m4_intel.run_demo --workbook /path/to/Meridian_Vendor_Input.xlsx --output /path/to/report.xlsx [--no-llm] [--mode live|cache]
+```
+
+Flow: read the workbook (V-000 is never processed) -> collect public pages (robots.txt honoured, at least 1.5 s between requests, pages typed TRUST/DOCS/WEB, well-known trust and docs paths probed) -> optional local-LLM review of ambiguous sentences -> exact-quote verification, integrity and attribution checks -> coverage-aware verdict -> a **new** workbook. The input workbook is never modified, and the exporter refuses an output path equal to the input.
+
+- Only columns O, P, Q and R of the six real vendors are filled; B to K are verified unchanged after saving. L to N and S to V are not assessed by this module.
+- Extra sheets: `Evidence Log` (every signal with offsets, URL, retrieval date, hash, tag, proposer, `review_status` of `RULE_PROPOSED_UNREVIEWED`, `ML_PROPOSED_UNREVIEWED` or `LLM_PROPOSED_UNREVIEWED`, and a blank `human_decision` for the analyst), `Coverage` (per-source status and verdict reasons), `Run Notes`.
+- Coverage is computed against the planned families (TRUST, DOCS, WEB). Blocked, failed or missing sources lower coverage and are reported; they never produce a `No` verdict. `No` is also refused whenever a verified signal names a provider or has specificity of 0.5 or more.
+- Local LLM: Ollama-compatible server on a loopback address only (`RADAR_LLM_URL`, default `http://127.0.0.1:11434`; `RADAR_LLM_MODEL`, default `qwen2.5:7b-instruct`). Non-local URLs are refused. It sees only ambiguous sentences, uses temperature 0 and JSON output, and a quote is accepted only as an exact substring of the verified sentence. It can raise a sentence's specificity to 0.7 but never lower it, and its output is labelled `LLM_PROPOSED_UNREVIEWED`. Responses are cached under `<cache-dir>/llm`. If the server is unreachable the run continues with rule/ML scores.
+- Use `--mode cache` to re-run from saved collections without touching the network. Cache, outputs and `*.xlsx` are git-ignored.
+- A page statement is a vendor claim, not independent proof of how or whether a capability is deployed.
+
