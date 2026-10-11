@@ -1,0 +1,38 @@
+--- a/m4_intel/train_specificity.py
++++ b/m4_intel/train_specificity.py
+@@ -267,20 +267,29 @@
+ 
+ 
+ def score_specificity(sentence: str, model_dir: str | Path = DEFAULT_MODEL_DIR) -> float:
+-    """Return estimated P(TECHNICAL) in [0,1], or rule score if model is absent.
++    """Return estimated P(TECHNICAL), safely falling back to rules on bad artifacts.
+ 
+     The persisted TF-IDF pipeline is local-only and runs on CPU without internet.
+     The rule fallback is a specificity heuristic, not a calibrated probability.
++    Missing, corrupt, incompatible, or unusable artifacts must not break callers.
+     """
+     if not isinstance(sentence, str):
+         raise TypeError("sentence must be a string")
+     model_path = Path(model_dir) / "tfidf_logistic_regression.joblib"
+     if model_path.is_file():
+-        model = joblib.load(model_path)
+-        classes = list(model.named_steps["classifier"].classes_)
+-        if 1 in classes:
+-            positive_index = classes.index(1)
+-            return float(np.clip(model.predict_proba([sentence])[0][positive_index], 0.0, 1.0))
++        try:
++            model = joblib.load(model_path)
++            classifier = model.named_steps["classifier"]
++            classes = list(classifier.classes_)
++            if 1 in classes and callable(getattr(model, "predict_proba", None)):
++                positive_index = classes.index(1)
++                probability = float(model.predict_proba([sentence])[0][positive_index])
++                if np.isfinite(probability):
++                    return float(np.clip(probability, 0.0, 1.0))
++        except Exception:
++            # A local artifact is an optional optimization, never a hard dependency.
++            # Fall back for corrupt, incompatible, or incomplete model files.
++            pass
+     return float(np.clip(score_specificity_rule(sentence), 0.0, 1.0))
+ 
+ 

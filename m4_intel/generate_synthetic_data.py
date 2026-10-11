@@ -14,7 +14,7 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT = ROOT / "data" / "synthetic_labels.csv"
 SEED = 42
-FIELDS = ("synthetic_id", "sentence", "label", "scenario", "provenance")
+FIELDS = ("synthetic_id", "sentence", "label", "scenario", "template_family", "provenance")
 
 PROVIDERS = ["an OpenAI model", "a Hugging Face transformer", "a locally hosted language model",
              "a scikit-learn classifier", "a computer-vision model", "a speech-recognition model"]
@@ -32,6 +32,12 @@ TECH_TEMPLATES = [
     "Our current system integrates {provider} for {task} {artifact}.",
     "The application sends incoming records to {provider} for {task} {artifact}.",
     "A live service uses {provider} to automate {task} {artifact}.",
+    "Production requests are passed to {provider}, which performs {task}; outputs are retained for audit.",
+    "The current release invokes {provider} to process {task} through a documented service endpoint.",
+    "Operational logs record {provider} predictions for {task} from the deployed workflow.",
+    "The application routes eligible records to {provider} and stores the resulting {task} decisions.",
+    "A running inference component applies {provider} to {task} during normal processing.",
+    "The production runbook documents how {provider} performs {task} and how failures are retried.",
 ]
 
 VAGUE_TEMPLATES = [
@@ -47,6 +53,12 @@ VAGUE_TEMPLATES = [
     "The product offers a modern, smart, and innovative digital experience.",
     "Future releases could include AI-enabled functionality if appropriate.",
     "We are committed to evaluating emerging technologies for future use cases.",
+    "We are evaluating whether {provider} might support {task} in a future release; no production deployment is described.",
+    "The roadmap mentions a possible {provider} integration for {task}, pending feasibility review.",
+    "Customers have asked whether {provider} could assist with {task}; the team has not committed to implementation.",
+    "The company is researching potential uses of {provider} for {task}, with no current operational use announced.",
+    "Marketing materials describe AI as an opportunity, but do not identify a deployed model or workflow.",
+    "A future pilot may consider {provider} for {task}, subject to approval and testing.",
 ]
 
 EXCLUDE_TEMPLATES = [
@@ -56,6 +68,8 @@ EXCLUDE_TEMPLATES = [
     "The report summarizes general AI market trends and analyst forecasts.",
     "The job applicant lists Python and machine learning among personal interests.",
     "The company commented on a public debate about AI regulation without describing its own use.",
+    "A third-party supplier advertises {provider} for {task}; this sentence does not establish our own implementation.",
+    "The analyst report says companies may use {provider} for {task}, without making a claim about this vendor.",
 ]
 
 
@@ -82,7 +96,8 @@ def build_rows(seed: int = SEED, technical_count: int = 48, vague_count: int = 4
             attempts += 1
             if attempts > count * 100:
                 raise RuntimeError(f"Could not generate {count} unique {label} examples")
-            template = rng.choice(templates)
+            template_index = rng.randrange(len(templates))
+            template = templates[template_index]
             sentence = template.format(provider=rng.choice(PROVIDERS), task=rng.choice(TASKS),
                                        artifact=rng.choice(ARTIFACTS))
             if label == "VAGUE":
@@ -93,8 +108,11 @@ def build_rows(seed: int = SEED, technical_count: int = 48, vague_count: int = 4
             if identity in seen:
                 continue
             seen.add(identity)
+            # Group by source template, not by generated wording, so grouped CV can
+            # hold out an entire family and expose template memorization.
+            family = f"{label.lower()}_template_{template_index + 1:02d}"
             rows.append({"synthetic_id": f"SYN-{len(rows)+1:04d}", "sentence": sentence,
-                         "label": label, "scenario": scenario,
+                         "label": label, "scenario": scenario, "template_family": family,
                          "provenance": "SYNTHETIC_GENERATED_NOT_VENDOR_EVIDENCE"})
 
     add(technical_count, "TECHNICAL", "current_specific_implementation", TECH_TEMPLATES)

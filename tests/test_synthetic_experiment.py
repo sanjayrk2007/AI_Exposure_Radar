@@ -46,8 +46,8 @@ def test_insufficient_class_count_fails_clearly():
 def test_loader_rejects_non_synthetic_provenance(tmp_path):
     path = tmp_path / "bad.csv"
     path.write_text(
-        "synthetic_id,sentence,label,scenario,provenance\n"
-        "S1,AI powers classification,TECHNICAL,current,REAL_VENDOR_EVIDENCE\n", encoding="utf-8")
+        "synthetic_id,sentence,label,scenario,template_family,provenance\n"
+        "S1,AI powers classification,TECHNICAL,current,technical_template_01,REAL_VENDOR_EVIDENCE\n", encoding="utf-8")
     with pytest.raises(ValueError, match="synthetic provenance"):
         load_synthetic(path)
 
@@ -95,3 +95,51 @@ def test_tfidf_vectorizer_never_sees_held_out_fold_text(monkeypatch):
         for index in test_indices:
             sentinel = f"sentinelonlyrow{index:03d}"
             assert sentinel not in vocabulary
+
+
+def test_grouped_evaluation_keeps_template_families_disjoint():
+    from m4_intel.run_synthetic_experiment import evaluate_grouped_synthetic
+
+    rows = build_rows(seed=29, technical_count=48, vague_count=48, exclude_count=4)
+    result = evaluate_grouped_synthetic(rows, seed=42, n_splits=5)
+    assert result["method"] == "StratifiedGroupKFold grouped by template_family"
+    assert result["template_family_overlap_detected"] is False
+    assert result["valid_folds"] >= 1
+    assert result["evaluation_coverage"] > 0
+    for fold in result["folds"]:
+        assert fold["template_family_overlap"] == []
+        if fold["status"] == "evaluated":
+            assert "macro_f1" in fold["tfidf_logistic_regression"]
+    assert "false_negative" in {e["error_type"] for e in result["error_analysis_on_evaluable_folds_only"]["rule_based"]} or result["valid_folds"] == 0
+
+
+def test_template_families_are_present_and_nonempty():
+    rows = build_rows(seed=5)
+    assert all(row.get("template_family") for row in rows)
+    assert len({row["template_family"] for row in rows if row["label"] == "TECHNICAL"}) >= 6
+    assert len({row["template_family"] for row in rows if row["label"] == "VAGUE"}) >= 6
+
+
+def test_hard_negative_future_provider_claims_are_labelled_vague():
+    rows = build_rows(seed=42, technical_count=48, vague_count=48, exclude_count=24)
+    hard_negatives = [row for row in rows if row["label"] == "VAGUE" and "provider" not in row["sentence"].casefold()
+                      and any(term in row["sentence"].casefold() for term in ("roadmap", "future", "evaluating", "pilot"))]
+    assert hard_negatives
+    assert all(row["provenance"] == "SYNTHETIC_GENERATED_NOT_VENDOR_EVIDENCE" for row in hard_negatives)
+
+
+def test_grouped_evaluation_reports_invalid_single_class_folds():
+    from m4_intel.run_synthetic_experiment import evaluate_grouped_synthetic
+
+    rows = [
+        {"synthetic_id": "S1", "sentence": "technical example alpha", "label": "TECHNICAL", "template_family": "tech_family"},
+        {"synthetic_id": "S2", "sentence": "technical example beta", "label": "TECHNICAL", "template_family": "tech_family"},
+        {"synthetic_id": "S3", "sentence": "vague example alpha", "label": "VAGUE", "template_family": "vague_family"},
+        {"synthetic_id": "S4", "sentence": "vague example beta", "label": "VAGUE", "template_family": "vague_family"},
+    ]
+    result = evaluate_grouped_synthetic(rows, n_splits=2)
+    assert result["status"] == "not_evaluable"
+    assert result["valid_folds"] == 0
+    assert result["invalid_folds"] == 2
+    assert result["evaluation_coverage"] == 0.0
+    assert all(fold["status"] == "not_evaluable_missing_class" for fold in result["folds"])
