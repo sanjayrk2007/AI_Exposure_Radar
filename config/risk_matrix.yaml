@@ -1,0 +1,43 @@
+base_matrix:
+  Critical:
+    CONFIRMED: "Critical"
+    STRONG: "Critical"
+    PROBABLE: "High"
+    MARKETING_ONLY: "Medium"
+    INCONCLUSIVE: "Medium"
+    NONE: "None identified"
+  High:
+    CONFIRMED: "High"
+    STRONG: "High"
+    PROBABLE: "Medium"
+    MARKETING_ONLY: "Low"
+    INCONCLUSIVE: "Low"
+    NONE: "None identified"
+  Medium:
+    CONFIRMED: "Medium"
+    STRONG: "Medium"
+    PROBABLE: "Low"
+    MARKETING_ONLY: "Low"
+    INCONCLUSIVE: "Low"
+    NONE: "None identified"
+  Low:
+    CONFIRMED: "Low"
+    STRONG: "Low"
+    PROBABLE: "Low"
+    MARKETING_ONLY: "Low"
+    INCONCLUSIVE: "Low"
+    NONE: "None identified"
+
+bands_order:
+  - "None identified"
+  - "Low"
+  - "Medium"
+  - "High"
+  - "Critical"
+
+timeframes:
+  Critical: "15"
+  High: "30"
+  Medium: "60"
+  Low: "90"
+  None identified: "180"

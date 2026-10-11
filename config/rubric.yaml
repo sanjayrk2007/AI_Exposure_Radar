@@ -1,0 +1,50 @@
+weights:
+  D: 0.25
+  S: 0.25
+  P: 0.20
+  R: 0.15
+  V: 0.15
+
+thresholds:
+  critical: 2.6
+  high: 1.8
+  medium: 1.0
+  low: 0.0
+
+criteria_keywords:
+  dependency:
+    3: ["critical", "total"]
+    2: ["high"]
+    1: ["moderate"]
+    0: ["low"]
+  data_sensitivity:
+    3: ["customer master", "tax id", "entire customer base", "1.4 million customers", "population scale"]
+    2: ["payment", "financial", "account identifier", "holding", "compensation"]
+    1: ["credential", "business data", "system configuration", "privileged access"]
+    0: ["none"]
+  payment_flow:
+    3: ["real-time payment", "rtp", "ach and rtp", "clearing and settlement", "dna core banking", "settle", "transmit"]
+    2: ["payment"]
+    1: ["batch", "statement", "notice"]
+    0: ["none"]
+  regulatory:
+    3: ["core banking", "payment network", "payments infrastructure", "clearing", "chips", "epn", "core platform"]
+    2: ["irs", "tax document", "regulatory notice", "regulated"]
+    1: ["compliance", "batch scheduling", "indirect"]
+    0: ["none"]
+  volume:
+    3: ["million", "population scale", "240 million", "19 million", "14 million", "2.1 million"]
+    2: ["100k"]
+    1: ["cycle", "monthly", "under 100k", "periodic"]
+    0: ["none", "not applicable"]
+
+floors:
+  F1:
+    description: "privileged access to production systems, job schedules or credentials"
+    target_tier: "High"
+  F2:
+    description: "operational dependency is Critical or Total"
+    target_tier: "High"
+  F3:
+    description: "population-scale PII with high transaction/document volume (S=3 and V=3)"
+    target_tier: "High"
