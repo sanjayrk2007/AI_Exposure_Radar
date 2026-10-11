@@ -1,0 +1,54 @@
+{
+  "Critical": {
+    "tier": "Critical",
+    "sources": [
+      "TRUST",
+      "DOCS",
+      "WEB",
+      "CAREERS",
+      "REPOS",
+      "FILINGS",
+      "MANUAL",
+      "FINGERPRINT"
+    ],
+    "max_pages": 40,
+    "max_depth": 3,
+    "stop_rule": "page budget, depth, or 3 consecutive pages without new AI terms; non-Critical also stops at a Confirmed signal"
+  },
+  "High": {
+    "tier": "High",
+    "sources": [
+      "TRUST",
+      "DOCS",
+      "WEB",
+      "CAREERS",
+      "REPOS",
+      "FILINGS"
+    ],
+    "max_pages": 25,
+    "max_depth": 2,
+    "stop_rule": "page budget, depth, or 3 consecutive pages without new AI terms; non-Critical also stops at a Confirmed signal"
+  },
+  "Medium": {
+    "tier": "Medium",
+    "sources": [
+      "TRUST",
+      "DOCS",
+      "WEB",
+      "CAREERS"
+    ],
+    "max_pages": 12,
+    "max_depth": 2,
+    "stop_rule": "page budget, depth, or 3 consecutive pages without new AI terms; non-Critical also stops at a Confirmed signal"
+  },
+  "Low": {
+    "tier": "Low",
+    "sources": [
+      "TRUST",
+      "DOCS"
+    ],
+    "max_pages": 6,
+    "max_depth": 1,
+    "stop_rule": "page budget, depth, or 3 consecutive pages without new AI terms; non-Critical also stops at a Confirmed signal"
+  }
+}
