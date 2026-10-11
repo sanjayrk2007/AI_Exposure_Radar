@@ -6,9 +6,11 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import re
 import sys
+from functools import lru_cache
 from collections import Counter
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -16,6 +18,7 @@ from typing import Any, Iterable
 
 import joblib
 import numpy as np
+import sklearn
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score, precision_score, recall_score
@@ -37,6 +40,9 @@ MIN_VENDORS_PER_CLASS = 2
 # model selection uses only folds with both classes and requires several of them.
 MIN_BOTH_CLASS_FOLDS = 3
 CALIBRATION_BINS = 5
+MODEL_FILENAME = "tfidf_logistic_regression.joblib"
+MANIFEST_FILENAME = "model_manifest.json"
+SYNTHETIC_LABELS_PATH = ROOT / "data" / "synthetic_labels.csv"
 
 
 def create_label_template(path: str | Path = DEFAULT_LABELS) -> Path:
@@ -52,6 +58,8 @@ def create_label_template(path: str | Path = DEFAULT_LABELS) -> Path:
 def load_labels(path: str | Path = DEFAULT_LABELS) -> list[dict[str, str]]:
     """Load manually reviewed rows; EXCLUDE and exact duplicates are not trained."""
     source = Path(path)
+    if source.exists() and source.resolve() == SYNTHETIC_LABELS_PATH.resolve():
+        raise ValueError("data/synthetic_labels.csv is synthetic and can never be used as real labels")
     if not source.exists():
         create_label_template(source)
         return []
@@ -70,6 +78,8 @@ def load_labels(path: str | Path = DEFAULT_LABELS) -> list[dict[str, str]]:
                 continue
             if not all((vendor, doc_id, sentence, label)):
                 raise ValueError(f"Incomplete label row at {source}:{line_number}")
+            if doc_id.upper().startswith("SYN") or "SYNTHETIC" in (row.get("provenance") or "").upper():
+                raise ValueError(f"Synthetic row rejected at {source}:{line_number}; synthetic data must not enter real labels")
             if vendor not in EXPECTED_VENDORS:
                 raise ValueError(f"Unexpected vendor_id {vendor!r} at {source}:{line_number}; V-000 is prohibited")
             if label not in {"TECHNICAL", "VAGUE", "EXCLUDE", "1", "0"}:
@@ -245,6 +255,67 @@ def _fold_evaluate(rows: list[dict[str, str]]) -> dict[str, Any]:
     return {"per_vendor_folds": folds, "model_summary": summary}
 
 
+def make_real_report(result: dict[str, Any]) -> str:
+    """Markdown report built only from a run_training result. It contains no synthetic metrics."""
+    dataset = result.get("dataset", {})
+    lines = ["# M4 real-label evaluation report", "",
+             f"> Generated from reviewed rows in `{dataset.get('labels_path', 'data/labels.csv')}` only. Synthetic data is never used here.", "",
+             f"- Status: `{result.get('status')}`", f"- Selected model: `{result.get('model_name')}`",
+             f"- Reviewed rows after EXCLUDE/dedupe: {dataset.get('rows_after_exclude_and_dedupe', 0)}",
+             f"- Rows by class: `{json.dumps(dataset.get('rows_by_class', {}), sort_keys=True)}`",
+             f"- Rows by vendor: `{json.dumps(dataset.get('rows_by_vendor', {}), sort_keys=True)}`",
+             f"- Seed: {result.get('evaluation_protocol', {}).get('seed', SEED)}; scikit-learn {sklearn.__version__}", ""]
+    summary = result.get("model_summary", {})
+    if not summary:
+        lines += ["No performance metrics are available for this run; see limitations.", ""]
+    else:
+        lines += ["## Leave-one-vendor-out summary", "",
+                  "| Model | Folds evaluated | Folds with both classes | Mean macro-F1 (all) | Mean macro-F1 (both-class folds) |",
+                  "|---|---:|---:|---:|---:|"]
+        for name, item in summary.items():
+            lines.append(f"| {name} | {item.get('folds_with_metrics', 0)} | {item.get('both_class_folds', 0)} | "
+                         f"{item.get('macro_f1_mean_fold')} | {item.get('macro_f1_mean_both_class_folds')} |")
+        lines += ["", "## Per-vendor folds", "",
+                  "| Held-out vendor | Status | n test | TECHNICAL / VAGUE | Rule macro-F1 | TF-IDF macro-F1 | Missing classes |",
+                  "|---|---|---:|---|---:|---:|---|"]
+        for vendor, fold in result.get("per_vendor_folds", {}).items():
+            rule, tfidf = fold.get("rule_based", {}), fold.get("tfidf_logistic_regression", {})
+            counts = fold.get("class_counts_test", {})
+            lines.append(f"| {vendor} | {fold.get('status')} | {fold.get('n_test')} | "
+                         f"{counts.get('TECHNICAL', 0)} / {counts.get('VAGUE', 0)} | {rule.get('macro_f1', 'n/a')} | "
+                         f"{tfidf.get('macro_f1', tfidf.get('status', 'n/a'))} | {', '.join(rule.get('missing_classes', [])) or 'none'} |")
+        calibration = summary.get("tfidf_logistic_regression", {}).get("calibration_out_of_fold")
+        if calibration:
+            lines += ["", "## TF-IDF out-of-fold calibration (descriptive, no recalibration applied)", "",
+                      f"Brier score: {calibration['brier_score']} over {calibration['n']} held-out predictions.", "",
+                      "| Bin | n | Mean predicted | Observed TECHNICAL fraction |", "|---|---:|---:|---:|"]
+            for row in calibration["bins"]:
+                lines.append(f"| {row['bin']} | {row['n']} | {row.get('mean_predicted', '')} | {row.get('observed_technical_fraction', '')} |")
+    decision = result.get("selection_decision")
+    if decision:
+        lines += ["", "## Selection decision", "", f"- Selected: `{decision['selected']}`", f"- {decision['rule']}",
+                  f"- Mean macro-F1 (both-class folds): rule {decision['rule_macro_f1_mean_both_class_folds']}, "
+                  f"TF-IDF {decision['tfidf_macro_f1_mean_both_class_folds']}; both-class folds required: "
+                  f"{decision['both_class_folds_required']} (rule {decision['both_class_folds_rule']}, TF-IDF {decision['both_class_folds_tfidf']})."]
+    lines += ["", "## Limitations", ""] + [f"- {item}" for item in result.get("limitations", [])] + [""]
+    return "\n".join(lines)
+
+
+def _write_outputs(result: dict[str, Any], metrics_file: Path, output: Path) -> None:
+    metrics_file.parent.mkdir(parents=True, exist_ok=True)
+    # Keep a previously generated synthetic section under its own key; it is never merged
+    # into the real-data fields or the real-data report.
+    if metrics_file.exists():
+        try:
+            previous = json.loads(metrics_file.read_text(encoding="utf-8"))
+            if isinstance(previous, dict) and "synthetic_experiment" in previous:
+                result["synthetic_experiment"] = previous["synthetic_experiment"]
+        except (OSError, json.JSONDecodeError):
+            pass
+    metrics_file.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    (output / "real_evaluation_report.md").write_text(make_real_report(result), encoding="utf-8")
+
+
 def run_training(labels_path: str | Path = DEFAULT_LABELS,
                  output_dir: str | Path = DEFAULT_MODEL_DIR,
                  metrics_path: str | Path | None = None) -> dict[str, Any]:
@@ -277,8 +348,7 @@ def run_training(labels_path: str | Path = DEFAULT_LABELS,
         result["limitations"].append("No reviewed cached-document sentences were present in labels.csv; no model was trained and no performance metrics are available.")
         result["limitations"].append("Collect sentences from actual cached vendor documents and manually label them. Do not fabricate rows to reach 300.")
         result["limitations"].append("The workspace currently has no cached vendor documents, so candidate collection cannot be performed from evidence here.")
-        metrics_file.parent.mkdir(parents=True, exist_ok=True)
-        metrics_file.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+        _write_outputs(result, metrics_file, output)
         return result
     technical_vendors = {
         row["vendor_id"] for row in rows if row["label"] == "1"
@@ -327,11 +397,7 @@ def run_training(labels_path: str | Path = DEFAULT_LABELS,
         result["limitations"].append(
             "No baseline evaluation or learned-model training was performed."
         )
-        metrics_file.parent.mkdir(parents=True, exist_ok=True)
-        metrics_file.write_text(
-            json.dumps(result, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        _write_outputs(result, metrics_file, output)
         return result
     missing_vendors = [vendor for vendor in EXPECTED_VENDORS if vendor_counts.get(vendor, 0) == 0]
     result["dataset"]["vendors_missing_rows"] = missing_vendors
@@ -362,13 +428,71 @@ def run_training(labels_path: str | Path = DEFAULT_LABELS,
         selected = "tfidf_logistic_regression"
         final_model = make_tfidf_model()
         final_model.fit([r["sentence"] for r in rows], [int(r["label"]) for r in rows])
-        joblib.dump(final_model, output / "tfidf_logistic_regression.joblib")
+        save_model_artifact(final_model, output, n_rows=len(rows), labels_sha256=_file_sha256(labels_path))
+    else:
+        # Never leave a stale artifact from an earlier run that this run did not select.
+        for stale in (output / MODEL_FILENAME, output / MANIFEST_FILENAME):
+            stale.unlink(missing_ok=True)
+    result["selection_decision"] = {
+        "selected": selected,
+        "rule_macro_f1_mean_fold": rule_mean, "tfidf_macro_f1_mean_fold": tfidf_mean,
+        "rule_macro_f1_mean_both_class_folds": rule_summary.get("macro_f1_mean_both_class_folds"),
+        "tfidf_macro_f1_mean_both_class_folds": tfidf_summary.get("macro_f1_mean_both_class_folds"),
+        "both_class_folds_required": MIN_BOTH_CLASS_FOLDS,
+        "both_class_folds_rule": rule_summary.get("both_class_folds", 0),
+        "both_class_folds_tfidf": tfidf_summary.get("both_class_folds", 0),
+        "rule": "TF-IDF is selected only if all six folds are evaluable, enough folds contain both classes, and its mean macro-F1 (all folds and both-class folds) is at least the rule baseline.",
+    }
     result["model_name"] = selected
     result["status"] = "evaluated_baselines_model_selected"
-    result["limitations"].append("Sentence-embedding and fine-tuned encoder baselines were not run: Phase 5 has no reviewed labels yet / no evidence they are justified; do not use a transformer until a meaningful labelled sample exists.")
-    metrics_file.parent.mkdir(parents=True, exist_ok=True)
-    metrics_file.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    result["limitations"].append("Sentence-embedding and fine-tuned encoder baselines were not run; consider them only if TF-IDF clearly underperforms on a sufficiently large reviewed sample.")
+    _write_outputs(result, metrics_file, output)
     return result
+
+
+def _file_sha256(path: str | Path) -> str | None:
+    try:
+        return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except OSError:
+        return None
+
+
+def save_model_artifact(model: Pipeline, output_dir: str | Path, *, n_rows: int,
+                        labels_sha256: str | None) -> Path:
+    """Persist a model with a manifest so inference can refuse an incompatible artifact."""
+    output = Path(output_dir)
+    output.mkdir(parents=True, exist_ok=True)
+    model_path = output / MODEL_FILENAME
+    joblib.dump(model, model_path)
+    manifest = {"model_name": "tfidf_logistic_regression", "scikit_learn_version": sklearn.__version__,
+                "seed": SEED, "n_training_rows": n_rows, "labels_sha256": labels_sha256}
+    (output / MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    return model_path
+
+
+def _manifest_compatible(model_dir: Path) -> bool:
+    """A missing manifest is tolerated (older artifacts); a mismatched library version is not."""
+    manifest_path = model_dir / MANIFEST_FILENAME
+    if not manifest_path.is_file():
+        return True
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        return isinstance(manifest, dict) and manifest.get("scikit_learn_version") == sklearn.__version__
+    except (OSError, json.JSONDecodeError):
+        return False
+
+
+@lru_cache(maxsize=4)
+def _load_model_cached(path: str, mtime_ns: int, size: int) -> Pipeline | None:
+    """Load once per file version. Returns None for any unusable artifact."""
+    try:
+        model = joblib.load(path)
+        classes = list(model.named_steps["classifier"].classes_)
+        if 1 in classes and callable(getattr(model, "predict_proba", None)):
+            return model
+    except Exception:
+        pass
+    return None
 
 
 def score_specificity_with_method(sentence: str, model_dir: str | Path = DEFAULT_MODEL_DIR) -> tuple[float, str]:
@@ -380,14 +504,14 @@ def score_specificity_with_method(sentence: str, model_dir: str | Path = DEFAULT
     """
     if not isinstance(sentence, str):
         raise TypeError("sentence must be a string")
-    model_path = Path(model_dir) / "tfidf_logistic_regression.joblib"
-    if sentence.strip() and model_path.is_file():
+    model_dir = Path(model_dir)
+    model_path = model_dir / MODEL_FILENAME
+    if sentence.strip() and model_path.is_file() and _manifest_compatible(model_dir):
         try:
-            model = joblib.load(model_path)
-            classifier = model.named_steps["classifier"]
-            classes = list(classifier.classes_)
-            if 1 in classes and callable(getattr(model, "predict_proba", None)):
-                positive_index = classes.index(1)
+            stat = model_path.stat()
+            model = _load_model_cached(str(model_path), stat.st_mtime_ns, stat.st_size)
+            if model is not None:
+                positive_index = list(model.named_steps["classifier"].classes_).index(1)
                 probability = float(model.predict_proba([sentence])[0][positive_index])
                 if np.isfinite(probability):
                     return float(np.clip(probability, 0.0, 1.0)), "ML"
