@@ -1,0 +1,245 @@
+# M3 Source Collectors configuration (owner: M3).
+# All rules and thresholds for CAREERS / REPOS / FILINGS live here (plan 4.1:
+# "reproducible, config-driven"). Shared files owned by others (lexicon.yaml,
+# depth_plans.yaml) are only READ by M3; nothing in them is redefined here.
+
+version: 1
+
+common:
+  # Terms always added to the M4-owned lexicon.yaml terms when spotting AI
+  # language in postings / filings. "AI", "ML", "LLM", "NLP" (<=4 upper-case
+  # letters) are matched case-sensitively so ordinary words never match.
+  extra_ai_terms:
+    - AI
+    - ML
+    - LLM
+    - NLP
+    - artificial intelligence
+    - machine learning
+    - deep learning
+    - generative AI
+    - large language model
+    - foundation model
+    - natural language processing
+  # Plan A.3 stop rule: stop a source family after this many consecutive pages
+  # that add no new AI-related terms.
+  stop_after_pages_without_new_terms: 3
+
+fetch:
+  # Hosts with a DOCUMENTED public programmatic interface (job-board JSON feeds,
+  # GitHub REST API, SEC EDGAR data/archives). Requests to these use kind="api"
+  # and skip the robots.txt page-crawl check, exactly as the providers'
+  # developer terms intend. Every other host is robots-checked.
+  api_hosts:
+    - boards-api.greenhouse.io
+    - api.lever.co
+    - api.eu.lever.co
+    - api.ashbyhq.com
+    - api.github.com
+    - data.sec.gov
+    - www.sec.gov
+  user_agent: "RadarBot (student case study, passive public fetch)"
+  min_interval_seconds: 1.5      # plan: at least 1.5 s per host
+  timeout_seconds: 20
+  retries: 2
+  backoff_seconds: 1.0
+  max_bytes_default: 5000000     # 5 MB per response
+  max_redirects: 5
+
+careers:
+  homepage_link_keywords: [careers, career, jobs, "join us", "join our team", "work with us", "work at", openings, "life at", opportunities]
+  common_paths:
+    - /careers
+    - /careers/
+    - /jobs
+    - /careers/jobs
+    - /about/careers
+    - /about-us/careers
+    - /company/careers
+    - /join-us
+    - /work-with-us
+  max_candidate_probes: 8        # careers-page discovery requests (not counted as pages)
+  max_listing_pages: 3           # extra listing/pagination pages followed (HTML path)
+  max_postings: 40               # hard ceiling of CAREERS documents per vendor
+  min_posting_text_chars: 120    # shorter pages are treated as unusable (JS shells)
+  # Feeds implemented (verified public JSON endpoints). Other ATS vendors are
+  # detected and reported but not scraped through unofficial endpoints.
+  ats_feeds_enabled: [greenhouse, lever, ashby]
+  # Never fetched: login-gated or aggregator hosts (plan: no LinkedIn scraping).
+  skip_hosts: [linkedin.com, indeed.com, glassdoor.com, facebook.com, x.com, twitter.com]
+  # "Keep technical and data roles" (plan 5, M3 Day 2).
+  technical_title_keywords:
+    - engineer
+    - developer
+    - software
+    - data
+    - machine learning
+    - "ml "
+    - "ai "
+    - " ai"
+    - scientist
+    - architect
+    - devops
+    - sre
+    - "site reliability"
+    - platform
+    - cloud
+    - security
+    - analytics
+    - analyst
+    - research
+    - programmer
+    - "full stack"
+    - backend
+    - frontend
+    - infrastructure
+    - "technical"
+    - automation
+    - "quantitative"
+    - "database"
+    - "mlops"
+    - "nlp"
+  technical_department_keywords: [engineering, technology, "data", "product development", research, "information technology", security, platform, infrastructure, "ai"]
+  # A title matching one of these is dropped UNLESS it also contains an AI term
+  # (e.g. "Recruiter" is dropped, "AI Recruiting Tools Engineer" is kept).
+  exclude_title_keywords: [recruiter, "talent acquisition", "account executive", "sales representative", "sales manager", "business development", "customer success", paralegal, "executive assistant", receptionist, "office manager", "marketing manager", "hr business partner", "payroll", "facilities", "teller", "branch manager"]
+
+github:
+  api_base: https://api.github.com
+  max_repos: 25                  # newest-pushed public repos examined per org
+  max_manifests_per_repo: 5
+  max_manifest_bytes: 400000
+  max_tree_depth: 3              # manifest path segments allowed (a/b/requirements.txt = 3)
+  max_api_calls_unauthenticated: 45   # GitHub allows 60/hour unauthenticated
+  max_api_calls_authenticated: 400
+  min_remaining_before_stop: 2
+  # Plan A.3 stop rule uses 3 consecutive pages; manifests are unranked and most
+  # contain no AI library, so GitHub uses a larger patience (documented deviation).
+  stop_patience: 6
+  exclude_forks: true
+  exclude_archived: true
+  ignored_path_parts: [node_modules, vendor, third_party, ".venv", venv, site-packages, dist, build]
+  manifest_basenames: [requirements.txt, pyproject.toml, package.json]
+  manifest_basename_patterns: ['^requirements[-_.A-Za-z0-9]*\.txt$']
+  # Analyst-confirmed organisation slugs, vendor_id -> slug. Empty on purpose:
+  # the plan requires orgs to be accepted only on a clear website/name match.
+  org_overrides: {}
+  # Extra accepted names per vendor (e.g. rebrands). vendor_id -> [names].
+  name_aliases:
+    V-005: ["BNY", "The Bank of New York Mellon Corporation", "BNY Mellon"]
+  use_search_fallback: true
+  # AI dependency detection (package-name level). Names are matched after
+  # lower-casing and normalising "_" and "." to "-".
+  ai_packages_exact:
+    - openai
+    - anthropic
+    - cohere
+    - mistralai
+    - google-generativeai
+    - google-genai
+    - google-cloud-aiplatform
+    - vertexai
+    - langchain
+    - langgraph
+    - langsmith
+    - llama-index
+    - llama-cpp-python
+    - llamaindex
+    - transformers
+    - sentence-transformers
+    - huggingface-hub
+    - diffusers
+    - peft
+    - accelerate
+    - bitsandbytes
+    - tokenizers
+    - tiktoken
+    - torch
+    - torchvision
+    - torchaudio
+    - pytorch-lightning
+    - tensorflow
+    - tensorflow-gpu
+    - keras
+    - jax
+    - flax
+    - onnxruntime
+    - onnxruntime-gpu
+    - scikit-learn
+    - sklearn
+    - xgboost
+    - lightgbm
+    - catboost
+    - mlflow
+    - kubeflow
+    - kfp
+    - sagemaker
+    - spacy
+    - nltk
+    - gensim
+    - haystack-ai
+    - farm-haystack
+    - semantic-kernel
+    - autogen
+    - pyautogen
+    - crewai
+    - dspy
+    - dspy-ai
+    - vllm
+    - chromadb
+    - faiss-cpu
+    - faiss-gpu
+    - pinecone-client
+    - pinecone
+    - weaviate-client
+    - "@anthropic-ai/sdk"
+    - "@google/generative-ai"
+    - "@google/genai"
+    - "@huggingface/inference"
+    - "@tensorflow/tfjs"
+    - "@tensorflow/tfjs-node"
+    - "@xenova/transformers"
+    - "@mistralai/mistralai"
+    - onnxruntime-node
+    - ml5
+    - brain.js
+    - langchain-core
+  ai_packages_prefixes:
+    - langchain-
+    - llama-index-
+    - "@langchain/"
+    - "@llamaindex/"
+    - "@azure/openai"
+    - "@aws-sdk/client-bedrock"
+    - "@aws-sdk/client-sagemaker"
+    - azure-ai-
+    - azure-cognitiveservices-
+    - tensorflow-
+    - torch-
+    - "@openai/"
+    - "@ai-sdk/"
+
+edgar:
+  user_agent_env: RADAR_SEC_USER_AGENT   # REQUIRED for live mode; "Name email@domain" (SEC fair access)
+  min_interval_seconds: 0.3              # ~3 req/s, well under the SEC 10 req/s ceiling
+  submissions_url: "https://data.sec.gov/submissions/CIK{cik10}.json"
+  tickers_url: "https://www.sec.gov/files/company_tickers.json"
+  archive_url: "https://www.sec.gov/Archives/edgar/data/{cik}/{accession_nodash}/{primary_document}"
+  annual_forms: ["10-K", "10-K405", "10-KT", "20-F", "40-F"]
+  max_filing_bytes: 40000000
+  context_sentences: 2           # plan: two sentences either side of AI terms
+  max_chunks: 30
+  max_chunk_chars: 3000
+  # Seed filers named in the plan ("expected: Fiserv and BNY, verify"). The CIKs
+  # were checked against EDGAR archive URLs; the live run ALSO verifies the
+  # entity name returned by the SEC against name_hints before using a CIK.
+  known_filers:
+    V-002:
+      cik: 798354
+      name_hints: ["fiserv"]
+    V-005:
+      cik: 1390777
+      name_hints: ["bank of new york mellon", "bny"]
+  # For other vendors the company list (company_tickers.json) is searched for an
+  # EXACT normalised-name match; no match => NOT_APPLICABLE.
+  legal_suffixes: [inc, incorporated, llc, "l l c", ltd, limited, corp, corporation, co, company, plc, lp, "n a", "the"]
