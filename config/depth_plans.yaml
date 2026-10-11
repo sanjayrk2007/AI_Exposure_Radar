@@ -1,0 +1,43 @@
+Critical:
+  max_pages: 40
+  max_depth: 3
+  sources:
+    - "TRUST"
+    - "DOCS"
+    - "WEB"
+    - "CAREERS"
+    - "REPOS"
+    - "FILINGS"
+    - "MANUAL"
+    - "FINGERPRINT"
+  stop_rule: "Page budget reached or 3 consecutive pages without AI terms. Keep going after Confirmed signal to find providers and use-cases."
+
+High:
+  max_pages: 25
+  max_depth: 2
+  sources:
+    - "TRUST"
+    - "DOCS"
+    - "WEB"
+    - "CAREERS"
+    - "REPOS"
+    - "FILINGS"
+  stop_rule: "Page budget reached, 3 consecutive pages without AI terms, or stop source family at Confirmed signal."
+
+Medium:
+  max_pages: 12
+  max_depth: 2
+  sources:
+    - "TRUST"
+    - "DOCS"
+    - "WEB"
+    - "CAREERS"
+  stop_rule: "Page budget reached, 3 consecutive pages without AI terms, or stop source family at Confirmed signal."
+
+Low:
+  max_pages: 6
+  max_depth: 1
+  sources:
+    - "TRUST"
+    - "DOCS"
+  stop_rule: "Page budget reached, 3 consecutive pages without AI terms, or stop source family at Confirmed signal."
