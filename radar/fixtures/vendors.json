@@ -1,0 +1,74 @@
+[
+  {
+    "vendor_id": "V-001",
+    "name": "AutomWorx",
+    "description": "An independent consulting firm specializing in workload automation solutions, including AppWorx, UC4 and Automic software implementation and related consulting services.",
+    "service": "Implementation, migration, managed support and modernization of the enterprise workload automation and batch scheduling estate.",
+    "category": "Professional Services",
+    "website": "www.automworx.com",
+    "process": "Batch scheduling across core systems",
+    "dependency": "High",
+    "data_class": "No direct customer data. Privileged access to production job schedules, system configuration and service credentials.",
+    "data_volume": "Not applicable"
+  },
+  {
+    "vendor_id": "V-002",
+    "name": "Fiserv, Inc.",
+    "description": "A global financial technology and payments provider delivering banking, merchant acquiring, payment processing, billing and point-of-sale solutions to financial institutions.",
+    "service": "The DNA core banking platform, a real-time account processing system supporting customer account management, transaction processing and core banking operations.",
+    "category": "Core Platform",
+    "website": "www.fiserv.com",
+    "process": "Core account processing and servicing",
+    "dependency": "Critical",
+    "data_class": "Full customer master, balances and transactions for 1.4 million customers.",
+    "data_volume": "240 million transactions"
+  },
+  {
+    "vendor_id": "V-003",
+    "name": "Financial Statement Services, Inc. (FSSI)",
+    "description": "A document outsourcing and customer communications provider delivering secure print, mail, electronic presentment and digital document delivery for transactional documents.",
+    "service": "Produces and distributes printed account statements and IRS tax documents, produces regulatory notices, and hosts the electronic notice platform.",
+    "category": "Document and Communications",
+    "website": "www.fssi-ca.com",
+    "process": "Customer statements and regulatory notices",
+    "dependency": "Moderate",
+    "data_class": "Names, addresses, account numbers, balances and tax identifiers for the entire customer base.",
+    "data_volume": "19 million documents"
+  },
+  {
+    "vendor_id": "V-004",
+    "name": "Terrapin Technologies, Inc.",
+    "description": "A financial technology company providing data management, reporting, analytics, compensation administration and compliance solutions for wealth management firms.",
+    "service": "A wealth management data solution that consolidates data from multiple sources and supports commission calculations, accounting activities and business volume tracking.",
+    "category": "Data and Reporting",
+    "website": "www.terrapintech.com",
+    "process": "Wealth management reporting and advisor compensation",
+    "dependency": "Moderate",
+    "data_class": "Portfolio holdings, revenue and advisor compensation data for 38,000 wealth clients.",
+    "data_volume": "12 monthly cycles"
+  },
+  {
+    "vendor_id": "V-005",
+    "name": "BNY",
+    "description": "A global financial services institution providing transaction banking, payment processing, cash management, treasury and trade finance through its Global Payments & Trade division.",
+    "service": "Real Time Payments (RTP) transmission services, including facilitating the transmission of RTP payment files from other financial institutions to Meridian.",
+    "category": "Payments",
+    "website": "www.bny.com",
+    "process": "Inbound real-time payments",
+    "dependency": "High",
+    "data_class": "Payment instructions, counterparty names and account identifiers.",
+    "data_volume": "2.1 million messages"
+  },
+  {
+    "vendor_id": "V-006",
+    "name": "The Clearing House Payments Company L.L.C.",
+    "description": "A US-based payments infrastructure provider operating critical financial networks, including EPN, CHIPS, the Image Exchange Network and the RTP network.",
+    "service": "Payment network infrastructure services, including the transmission and processing of ACH transactions and Real-Time Payments.",
+    "category": "Payments Infrastructure",
+    "website": "www.theclearinghouse.org",
+    "process": "ACH and RTP clearing and settlement",
+    "dependency": "Critical",
+    "data_class": "Payment messages in transit only.",
+    "data_volume": "14 million messages"
+  }
+]

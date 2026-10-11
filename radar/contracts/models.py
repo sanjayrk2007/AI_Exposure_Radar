@@ -11,6 +11,39 @@ from typing import Any
 
 
 @dataclass
+class VendorProfile:
+    vendor_id: str
+    name: str
+    description: str
+    service: str
+    category: str
+    website: str
+    process: str
+    dependency: str
+    data_class: str
+    data_volume: str
+
+
+@dataclass
+class CriticalityResult:
+    vendor_id: str
+    tier: str
+    scores: dict[str, Any] = field(default_factory=dict)
+    floors_applied: list[str] = field(default_factory=list)
+    rationale: str = ""
+
+
+@dataclass
+class DepthPlan:
+    vendor_id: str
+    tier: str
+    sources: list[Any] = field(default_factory=list)
+    max_pages: int = 0
+    max_depth: int = 0
+    stop_rule: str = ""
+
+
+@dataclass
 class Document:
     doc_id: str
     vendor_id: str
@@ -64,3 +97,12 @@ class VendorVerdict:
     providers: list[str] = field(default_factory=list)
     use_cases: list[str] = field(default_factory=list)
     reasons: list[str] = field(default_factory=list)
+
+
+@dataclass
+class RiskAssessment:
+    vendor_id: str
+    risk_class: str
+    rationale: str
+    recommended_action: str
+
