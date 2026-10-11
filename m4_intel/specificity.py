@@ -201,7 +201,9 @@ def tag_signal_score(score: float, weights_path: str | Path = DEFAULT_WEIGHTS_PA
 
 def score_signal(signal: Signal, source_class: str | None = None,
                  weights_path: str | Path = DEFAULT_WEIGHTS_PATH,
-                 lexicon_path: str | Path | None = None) -> Signal:
+                 lexicon_path: str | Path | None = None,
+                 specificity: float | None = None,
+                 method: str | None = None) -> Signal:
     """Populate specificity, providers, weight, score and tag on a verified Signal.
 
     The Signal's source_type stays unchanged. For MANUAL evidence, pass
@@ -214,7 +216,15 @@ def score_signal(signal: Signal, source_class: str | None = None,
     if signal.verified is not True:
         raise ValueError("Cannot score an unverified Signal")
     config = load_source_weights(weights_path)
-    specificity = score_specificity_rule(signal.excerpt, lexicon_path, weights_path)
+    # Callers may supply a classifier probability; otherwise the rule score is used.
+    if specificity is None:
+        specificity = score_specificity_rule(signal.excerpt, lexicon_path, weights_path)
+    elif isinstance(specificity, bool) or not 0.0 <= float(specificity) <= 1.0:
+        raise ValueError("specificity must be within [0, 1]")
+    if method is not None:
+        if method not in {"RULE", "ML", "LLM", "MANUAL"}:
+            raise ValueError(f"Unknown signal method: {method!r}")
+        signal.method = method
     weight = get_source_weight(signal.source_type, source_class, weights_path)
     score = round(weight * specificity, 10)
     signal.specificity = specificity

@@ -82,3 +82,10 @@ python -m m4_intel.train_specificity
 The command writes `m4_intel/models/specificity_v1/metrics.json` and only saves a local TF-IDF pipeline if it performs at least as well as the rule baseline on mean fold macro-F1. The public inference helper is `from m4_intel.scoring import score_specificity`; it returns a classifier probability when a saved pipeline is available, otherwise it falls back to `score_specificity_rule`. The fallback is a heuristic score, not a calibrated probability. Model files and metrics stay local and are ignored by Git.
 
 No cached vendor documents are currently present in this workspace, so no candidate sentences or labels have been fabricated. Do not train a Transformer or use Colab until the reviewed sample is large and balanced enough to justify it. Public datasets are not required for this Optiv-specific evaluation.
+
+## M4 integration entry point and evaluation hardening
+
+- `m4_intel/analyse.py` implements the shared contract `analyse(vendor, docs, reports, planned_sources=None) -> (signals, verdict)`. It extracts candidates, keeps only quote-verified signals, scores specificity with the saved classifier when a usable local artifact exists (otherwise the rule score), and returns a coverage-aware verdict. `analyse_detailed` also returns signals flagged for review (classifier/rule disagreement above 0.4, or specificity in the 0.3–0.6 band). No LLM or network call is made; the flags are not auto-resolved. V-000 is refused.
+- Model selection now also requires at least 3 leave-one-vendor-out folds whose held-out vendor has both classes, because single-class folds give degenerate macro-F1. This only tightens the existing gate.
+- When real labels are evaluated, `metrics.json` includes an out-of-fold calibration table and Brier score for the TF-IDF probabilities. It is descriptive only and no recalibration is applied.
+- Synthetic results remain in the separate `synthetic_experiment` section. Synthetic families are label-pure and built around the same cues as the rule score, so near-perfect synthetic TF-IDF scores are not evidence for model selection.

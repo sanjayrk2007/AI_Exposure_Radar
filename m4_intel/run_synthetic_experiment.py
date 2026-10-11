@@ -301,6 +301,7 @@ def make_report(metrics: dict[str, Any], real_metrics: dict[str, Any] | None = N
               "- Real-data model performance is not claimed unless the genuine-data readiness gate and evaluation protocol support it.", "",
               "## Interpretation and limitations", "",
               "- These are out-of-fold metrics on generated examples, not on actual vendor evidence.",
+              "- Every template family is label-pure and written around the same cue words the rule score and lexicon use (hedges, providers, 'currently'), so near-perfect TF-IDF scores are expected and are uninformative about real vendors; the TF-IDF-over-rule gap here must not be used to justify selecting a model.",
               "- Stratified row-level CV can still benefit from shared templates; grouped evaluation tests transfer to unseen template families.",
               "- Grouped evaluation may have invalid folds when a test or training fold lacks a class; invalid folds and coverage are reported rather than hidden.",
               "- Synthetic sentences use controlled patterns and may be easier or more repetitive than real public disclosures.",
