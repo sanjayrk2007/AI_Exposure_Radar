@@ -1,0 +1,17 @@
+standard:
+  sources:
+    - TRUST
+    - DOCS
+    - WEB
+  max_pages: 20
+  max_depth: 2
+  stop_rule: page_budget
+
+deep:
+  sources:
+    - TRUST
+    - DOCS
+    - WEB
+  max_pages: 40
+  max_depth: 3
+  stop_rule: page_budget

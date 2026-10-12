@@ -1,0 +1,8 @@
+requests
+beautifulsoup4
+lxml
+trafilatura
+pdfplumber
+PyYAML
+pytest
+reportlab

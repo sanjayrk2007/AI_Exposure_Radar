@@ -1,0 +1,14 @@
+[
+  {
+    "vendor_id": "demo-vendor",
+    "name": "Example AI Vendor",
+    "description": "Example vendor used for local testing",
+    "service": "AI-powered software",
+    "category": "Artificial Intelligence",
+    "website": "https://example.com",
+    "process": "Processes user-provided data",
+    "dependency": "External AI service",
+    "data_class": "Business data",
+    "data_volume": "Medium"
+  }
+]
