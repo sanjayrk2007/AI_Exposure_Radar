@@ -31,15 +31,24 @@ CAV = {"CAREERS": "Job postings show capability and intent, not deployment: a po
 
 
 def vendors():
-    import openpyxl
-    ws = openpyxl.load_workbook(sys.argv[1] if len(sys.argv) > 1 else "Meridian_Vendor_Input.xlsx")["Vendor Inventory"]
-    keys = ["vendor_id", "name", "description", "service", "category", "website", "process", "dependency", "data_class", "data_volume"]
-    out = []
-    for r in range(6, 12):
-        row = [ws.cell(r, c).value for c in range(2, 12)]
-        assert row[0] != "V-000"
-        out.append(dict(zip(keys, row)))
-    (FX / "vendors.json").write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    """Validate existing vendor profiles without overwriting them."""
+    path = FX / "vendors.json"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"{path} is missing. Supply the original vendor workbook "
+            "or restore vendors.json before generating fixtures."
+        )
+
+    profiles = json.loads(path.read_text(encoding="utf-8"))
+    expected = {f"V-{i:03d}" for i in range(1, 7)}
+    actual = {profile.get("vendor_id") for profile in profiles}
+
+    if len(profiles) != 6 or actual != expected:
+        raise ValueError(
+            f"Expected vendor IDs {sorted(expected)}, got {sorted(actual)}"
+        )
+
+    print("Validated existing vendor profiles; left vendors.json unchanged.")
 
 
 def depth_plans():
