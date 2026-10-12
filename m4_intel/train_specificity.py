@@ -17,13 +17,24 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Iterable
 
-import joblib
-import numpy as np
-import sklearn
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import f1_score, precision_score, recall_score
-from sklearn.pipeline import Pipeline
+try:
+    import joblib
+    import numpy as np
+    import sklearn
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import f1_score, precision_score, recall_score
+    from sklearn.pipeline import Pipeline
+    HAS_SKLEARN = True
+except Exception:
+    joblib = None
+    np = None
+    sklearn = None
+    TfidfVectorizer = None
+    LogisticRegression = None
+    f1_score = precision_score = recall_score = None
+    Pipeline = None
+    HAS_SKLEARN = False
 
 from m4_intel.specificity import score_specificity_rule
 
@@ -569,7 +580,8 @@ def score_specificity_with_method(sentence: str, model_dir: str | Path = DEFAULT
         except Exception:
             # A local artifact is an optional optimization, never a hard dependency.
             pass
-    return float(np.clip(score_specificity_rule(sentence), 0.0, 1.0)), "RULE"
+    rule_score = float(score_specificity_rule(sentence))
+    return min(1.0, max(0.0, rule_score)), "RULE"
 
 
 def score_specificity(sentence: str, model_dir: str | Path = DEFAULT_MODEL_DIR) -> float:

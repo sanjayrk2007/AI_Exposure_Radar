@@ -12,25 +12,14 @@ __pycache__/
 Meridian_Vendor_Input.xlsx
 Case Study Brief.pdf
 
-# OS files
-.DS_Store
-*.DS_Store
-
 # Cached vendor data, evidence and generated results
 cache/
 cache_*/
-*_cache/
-llm_cache/
 outputs/
-*.xlsx
-*.numbers
 data/labels*.csv
 data/candidates*.jsonl
 data/candidate_review*.csv
 data/candidate_review*.md
-data/real_label_review_queue*.csv
-data/evidence_review*.csv
-data/*.bak
 
 # Local ML artifacts
 m4_intel/models/
