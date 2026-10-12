@@ -1,0 +1,18 @@
+criticality:
+  rationale: "Score: {score:.2f} (D={d}, S={s}, P={p}, R={r}, V={v}).{floors_text} Operational dependency is characterized as {dep} over {process}, governing {data_class}."
+  floors:
+    F1: " Escalated to High via Floor F1 (privileged access to production system schedules, configurations, and service credentials)."
+    F2: " Escalated to Critical via Floor F2 (Critical operational dependency on core clearing/settlement networks)."
+    F3: " Escalated to High via Floor F3 (population-scale PII with high transaction/document volume)."
+
+depth:
+  applied: "Planned {tier} depth ({max_pages} pages, depth {max_depth}; {sources}). Consulted {sources_consulted} ({pages_fetched} page(s) collected; coverage: {coverage:.3f}). Status: {status_notes}. Stop rule: {stop_rule}"
+
+risk:
+  rationale: "Criticality baseline is {tier} based on access to {data_class} and {dep} dependency. Public evidence search yielded {strength} AI indicators with constrained coverage ({coverage:.3f}), resulting in an AI usage verdict of {ai_usage}. Under Meridian's risk framework, an unverified AI footprint against {tier} criticality warrants a {risk_class} risk classification.{aggravators_text}"
+
+action:
+  recommended: "Issue targeted third-party AI assessment questionnaire within {timeframe} business days addressing model provider disclosures, data retention boundaries, and explicit restrictions against training foundation models on Meridian data. Register vendor on internal AI sub-processor tracking register with pending status. Require contractual notification prior to introducing autonomous agentic capabilities or new AI dependencies into production pipelines."
+
+use_case:
+  hedged: "Vendor may be deploying {use_cases} within their {service} offerings to support {process}."

@@ -1,0 +1,27 @@
+# Draft evidence weights and thresholds from the shared AI Exposure Radar plan.
+# These values are configurable starting points, not calibrated outcomes.
+source_weights:
+  TRUST: 5.0
+  DOCS: 4.0
+  FILINGS: 4.0
+  FINGERPRINT: 4.0
+  CAREERS: 2.5
+  REPOS: 2.5
+  WEB: 1.5
+  MANUAL:
+    primary: 3.5
+    third_party: 2.0
+
+specificity_factors:
+  provider_model_framework: 0.4
+  concrete_task_or_data: 0.3
+  technical_artifact: 0.2
+  present_tense_current_use: 0.1
+  future_or_hedged: -0.3
+
+# Inclusive lower bounds. The highest matching threshold wins.
+tag_thresholds:
+  CONFIRMED: 4.5
+  STRONG: 3.0
+  PROBABLE: 2.0
+  MARKETING_ONLY: 0.0000000001
