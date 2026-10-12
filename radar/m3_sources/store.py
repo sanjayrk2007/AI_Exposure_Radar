@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from dataclasses import asdict, fields
 from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence, Union
@@ -30,6 +31,12 @@ _locks_guard = threading.Lock()
 def _lock_for(path: Path) -> threading.RLock:
     with _locks_guard:
         return _locks.setdefault(str(path.resolve()), threading.RLock())
+
+
+def _vendor_lock(vendor_id: str, cache_dir: Optional[Union[str, Path]] = None) -> threading.RLock:
+    vdir = vendor_dir(vendor_id, cache_dir)
+    with _locks_guard:
+        return _locks.setdefault(str(vdir.resolve()), threading.RLock())
 
 
 def vendor_dir(vendor_id: str, cache_dir: Optional[Union[str, Path]] = None) -> Path:
@@ -63,8 +70,16 @@ def _read_json(path: Path) -> tuple[list[dict[str, Any]], Optional[str]]:
     dict wrapping the list (e.g. ``{"documents": [...]}``) so it can be preserved."""
     if not path.is_file():
         return [], None
-    with path.open("r", encoding="utf-8") as fh:
-        data = json.load(fh)
+    data: Any = None
+    for attempt in range(10):
+        try:
+            with path.open("r", encoding="utf-8") as fh:
+                data = json.load(fh)
+            break
+        except (PermissionError, json.JSONDecodeError):
+            if attempt == 9:
+                raise
+            time.sleep(0.005 * (attempt + 1))
     if isinstance(data, list):
         return [x for x in data if isinstance(x, dict)], None
     if isinstance(data, dict):
@@ -78,17 +93,31 @@ def _write_json(path: Path, items: list[dict[str, Any]], wrapper_key: Optional[s
     payload: Any = {wrapper_key: items} if wrapper_key else items
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + f".{os.getpid()}.{threading.get_ident()}.tmp")
-    with tmp.open("w", encoding="utf-8") as fh:
-        json.dump(payload, fh, ensure_ascii=False, indent=2, sort_keys=False)
-        fh.write("\n")
-    os.replace(tmp, path)
+    try:
+        with tmp.open("w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=False, indent=2, sort_keys=False)
+            fh.write("\n")
+        for attempt in range(10):
+            try:
+                os.replace(tmp, path)
+                break
+            except PermissionError:
+                if attempt == 9:
+                    raise
+                time.sleep(0.005 * (attempt + 1))
+    finally:
+        if tmp.is_file():
+            try:
+                tmp.unlink()
+            except OSError:
+                pass
 
 
 # ---- reads ----------------------------------------------------------------- #
 def read_documents(vendor_id: str, source_types: Optional[Sequence[str]] = None,
                    cache_dir: Optional[Union[str, Path]] = None) -> list[Document]:
     path = documents_path(vendor_id, cache_dir)
-    with _lock_for(path):
+    with _vendor_lock(vendor_id, cache_dir), _lock_for(path):
         items, _ = _read_json(path)
     docs = [document_from_dict(d) for d in items]
     if source_types is not None:
@@ -100,7 +129,7 @@ def read_documents(vendor_id: str, source_types: Optional[Sequence[str]] = None,
 def read_reports(vendor_id: str, source_types: Optional[Sequence[str]] = None,
                  cache_dir: Optional[Union[str, Path]] = None) -> list[SourceReport]:
     path = reports_path(vendor_id, cache_dir)
-    with _lock_for(path):
+    with _vendor_lock(vendor_id, cache_dir), _lock_for(path):
         items, _ = _read_json(path)
     reps = [report_from_dict(d) for d in items]
     if source_types is not None:
@@ -121,22 +150,23 @@ def write_source_results(vendor_id: str, source_type: str, docs: Iterable[Docume
         if d.source_type != source_type or d.vendor_id != vendor_id:
             raise ValueError(f"document {d.doc_id} does not belong to {vendor_id}/{source_type}")
     dpath, rpath = documents_path(vendor_id, cache_dir), reports_path(vendor_id, cache_dir)
-    with _lock_for(dpath):
-        items, wrap = _read_json(dpath)
-        kept = [x for x in items if x.get("source_type") != source_type]
-        merged = kept + [asdict(d) for d in sorted(docs, key=lambda d: d.doc_id)]
-        _write_json(dpath, merged, wrap)
-    with _lock_for(rpath):
-        items, wrap = _read_json(rpath)
-        kept = [x for x in items if x.get("source_type") != source_type]
-        _write_json(rpath, kept + [asdict(report)], wrap)
+    with _vendor_lock(vendor_id, cache_dir):
+        with _lock_for(dpath):
+            items, wrap = _read_json(dpath)
+            kept = [x for x in items if x.get("source_type") != source_type]
+            merged = kept + [asdict(d) for d in sorted(docs, key=lambda d: d.doc_id)]
+            _write_json(dpath, merged, wrap)
+        with _lock_for(rpath):
+            items, wrap = _read_json(rpath)
+            kept = [x for x in items if x.get("source_type") != source_type]
+            _write_json(rpath, kept + [asdict(report)], wrap)
 
 
 def upsert_document(doc: Document, cache_dir: Optional[Union[str, Path]] = None) -> None:
     """Insert or replace one document (matched on ``doc_id``)."""
     validate_vendor_id(doc.vendor_id)
     path = documents_path(doc.vendor_id, cache_dir)
-    with _lock_for(path):
+    with _vendor_lock(doc.vendor_id, cache_dir), _lock_for(path):
         items, wrap = _read_json(path)
         items = [x for x in items if x.get("doc_id") != doc.doc_id]
         items.append(asdict(doc))
@@ -148,7 +178,7 @@ def remove_document(vendor_id: str, doc_id: str, source_type: str,
     """Delete one document by id (restricted to ``source_type``). True if removed."""
     validate_vendor_id(vendor_id)
     path = documents_path(vendor_id, cache_dir)
-    with _lock_for(path):
+    with _vendor_lock(vendor_id, cache_dir), _lock_for(path):
         items, wrap = _read_json(path)
         kept = [x for x in items if not (x.get("doc_id") == doc_id and x.get("source_type") == source_type)]
         if len(kept) == len(items):
