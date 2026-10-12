@@ -127,7 +127,13 @@ def run_pipeline(
             continue
 
         # Scoring is provisional ranking only. It is not a truth determination.
-        score_signal(signal)
+        source_class = None
+        if doc.get("source_type") == "MANUAL":
+            meta = doc.get("meta") or {}
+            source_class = meta.get("source_class") if isinstance(meta, dict) else None
+            if source_class not in {"primary", "third_party"}:
+                source_class = "primary"
+        score_signal(signal, source_class=source_class)
         row = _signal_dict(signal)
         row.update({
             "title": candidate.get("title", doc.get("title", "")),
