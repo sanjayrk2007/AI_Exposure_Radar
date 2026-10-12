@@ -1,0 +1,28 @@
+[
+  {
+    "doc_id": "V-006-MANUAL-dd39a63b1c33",
+    "vendor_id": "V-006",
+    "source_type": "MANUAL",
+    "url": "https://fixtures.invalid/V-006/press-article",
+    "fetched_at": "2026-10-08T00:00:00Z",
+    "http_status": 200,
+    "content_hash": "a4c12bb113b91dce57f42e271b1f362a20dc66f06ee09ab03320400983a95b7f",
+    "title": "[SYNTHETIC FIXTURE] Manual evidence (third party): fixtures.invalid",
+    "text": "An industry article reports that the operator is piloting machine learning to flag unusual payment patterns.",
+    "snapshot_path": "V-006/snapshots/manual-V-006-MANUAL-dd39a63b1c33.txt",
+    "meta": {
+      "source_class": "third_party",
+      "captured_at": "2026-10-08T00:00:00Z",
+      "url_as_entered": "https://fixtures.invalid/V-006/press-article",
+      "screenshot_path": "",
+      "retrieval_method": "analyst_manual_capture",
+      "http_status_nominal": true,
+      "submitted_at": "2026-10-12T23:47:50Z",
+      "synthetic": true,
+      "evidence_caveat": "Analyst-submitted evidence; the text was pasted by an analyst and has not been independently re-fetched by the tool.",
+      "collector": "m3/1.0",
+      "text_snapshot_path": "V-006/snapshots/manual-V-006-MANUAL-dd39a63b1c33.txt",
+      "fixture_note": "Synthetic test data; not collected from any real source."
+    }
+  }
+]

@@ -1,0 +1,27 @@
+[
+  {
+    "doc_id": "V-004-CAREERS-78e8b9e41bd5",
+    "vendor_id": "V-004",
+    "source_type": "CAREERS",
+    "url": "https://fixtures.invalid/V-004/careers/2001",
+    "fetched_at": "2026-10-09T09:00:00Z",
+    "http_status": 200,
+    "content_hash": "4cb21fd493649695fd40affb2f38d637ddd2f66536511574dea56fc8a0e80252",
+    "title": "[SYNTHETIC FIXTURE] Data Engineer",
+    "text": "Data Engineer\nBuild ETL pipelines that consolidate advisor commission data. Python, SQL and cloud data warehouses. Nothing in this role involves AI.",
+    "snapshot_path": "V-004/snapshots/fixture-careers-2001.txt",
+    "meta": {
+      "synthetic": true,
+      "fixture_note": "Synthetic test data; not collected from any real source.",
+      "evidence_caveat": "Job postings show capability and intent, not deployment: a posting that mentions AI is not proof that AI is used in a service delivered to Meridian.",
+      "collector": "m3/1.0-fixture",
+      "ats": "greenhouse",
+      "job_id": "2001",
+      "department": "Data",
+      "location": "Remote",
+      "ai_terms": [],
+      "is_technical_role": true,
+      "evidence_class": "capability_and_intent"
+    }
+  }
+]

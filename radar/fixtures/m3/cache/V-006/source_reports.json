@@ -1,0 +1,23 @@
+[
+  {
+    "vendor_id": "V-006",
+    "source_type": "CAREERS",
+    "status": "BLOCKED",
+    "pages_fetched": 1,
+    "note": "careers page not readable: blocked (robots) at https://fixtures.invalid/V-006/careers"
+  },
+  {
+    "vendor_id": "V-006",
+    "source_type": "REPOS",
+    "status": "NOT_APPLICABLE",
+    "pages_fetched": 0,
+    "note": "no public GitHub organisation clearly matches this vendor (accepted only on website/name match), so repositories were skipped"
+  },
+  {
+    "vendor_id": "V-006",
+    "source_type": "FILINGS",
+    "status": "NOT_APPLICABLE",
+    "pages_fetched": 1,
+    "note": "no SEC registrant with this exact company name in EDGAR's company list; treated as a non-filer"
+  }
+]

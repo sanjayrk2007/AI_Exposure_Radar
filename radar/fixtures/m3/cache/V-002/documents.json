@@ -1,0 +1,164 @@
+[
+  {
+    "doc_id": "V-002-CAREERS-596787eaefba",
+    "vendor_id": "V-002",
+    "source_type": "CAREERS",
+    "url": "https://fixtures.invalid/V-002/careers/1002",
+    "fetched_at": "2026-10-09T09:00:00Z",
+    "http_status": 200,
+    "content_hash": "c99558c59173424af3c7d3e8fd089856c294b1f9c03dc1f2ac602301b32d4ee8",
+    "title": "[SYNTHETIC FIXTURE] Applied AI Engineer, Document Processing",
+    "text": "Applied AI Engineer, Document Processing\nDesign retrieval-augmented generation services using large language model APIs for document summarisation. Experience with embeddings and vector databases is required.",
+    "snapshot_path": "V-002/snapshots/fixture-careers-1002.txt",
+    "meta": {
+      "synthetic": true,
+      "fixture_note": "Synthetic test data; not collected from any real source.",
+      "evidence_caveat": "Job postings show capability and intent, not deployment: a posting that mentions AI is not proof that AI is used in a service delivered to Meridian.",
+      "collector": "m3/1.0-fixture",
+      "ats": "greenhouse",
+      "job_id": "1002",
+      "department": "Engineering",
+      "location": "Remote",
+      "ai_terms": [
+        "large language model",
+        "retrieval-augmented",
+        "embeddings"
+      ],
+      "is_technical_role": true,
+      "evidence_class": "capability_and_intent"
+    }
+  },
+  {
+    "doc_id": "V-002-CAREERS-973dcb27f2de",
+    "vendor_id": "V-002",
+    "source_type": "CAREERS",
+    "url": "https://fixtures.invalid/V-002/careers/1001",
+    "fetched_at": "2026-10-09T09:00:00Z",
+    "http_status": 200,
+    "content_hash": "e53abf4a688a47751ed20c85d51defe68ad4ad94bbdcd1c643a37c6f948fafa7",
+    "title": "[SYNTHETIC FIXTURE] Senior Machine Learning Engineer, Fraud",
+    "text": "Senior Machine Learning Engineer, Fraud\nYou will build and deploy machine learning models that score card transactions for fraud. We use PyTorch and Python. You will own model monitoring and retraining pipelines.",
+    "snapshot_path": "V-002/snapshots/fixture-careers-1001.txt",
+    "meta": {
+      "synthetic": true,
+      "fixture_note": "Synthetic test data; not collected from any real source.",
+      "evidence_caveat": "Job postings show capability and intent, not deployment: a posting that mentions AI is not proof that AI is used in a service delivered to Meridian.",
+      "collector": "m3/1.0-fixture",
+      "ats": "greenhouse",
+      "job_id": "1001",
+      "department": "Engineering",
+      "location": "Remote",
+      "ai_terms": [
+        "machine learning",
+        "pytorch"
+      ],
+      "is_technical_role": true,
+      "evidence_class": "capability_and_intent"
+    }
+  },
+  {
+    "doc_id": "V-002-CAREERS-edd41be94512",
+    "vendor_id": "V-002",
+    "source_type": "CAREERS",
+    "url": "https://fixtures.invalid/V-002/careers/1003",
+    "fetched_at": "2026-10-09T09:00:00Z",
+    "http_status": 200,
+    "content_hash": "9c81ac8707eb3511da9bde232588c2fafc76cde31e16427dbd75000012d57d4e",
+    "title": "[SYNTHETIC FIXTURE] Staff Platform Engineer",
+    "text": "Staff Platform Engineer\nOperate the Kubernetes platform that hosts our core processing services. Strong Go and Linux skills required.",
+    "snapshot_path": "V-002/snapshots/fixture-careers-1003.txt",
+    "meta": {
+      "synthetic": true,
+      "fixture_note": "Synthetic test data; not collected from any real source.",
+      "evidence_caveat": "Job postings show capability and intent, not deployment: a posting that mentions AI is not proof that AI is used in a service delivered to Meridian.",
+      "collector": "m3/1.0-fixture",
+      "ats": "greenhouse",
+      "job_id": "1003",
+      "department": "Engineering",
+      "location": "Remote",
+      "ai_terms": [],
+      "is_technical_role": true,
+      "evidence_class": "capability_and_intent"
+    }
+  },
+  {
+    "doc_id": "V-002-REPOS-2aaf95d46b31",
+    "vendor_id": "V-002",
+    "source_type": "REPOS",
+    "url": "https://fixtures.invalid/V-002/repos/sdk-requirements",
+    "fetched_at": "2026-10-09T09:00:00Z",
+    "http_status": 200,
+    "content_hash": "aed8b0fbfaa37e171c4aa367a9d9ea6749c90e65b645389949ddd61c04ee38d6",
+    "title": "[SYNTHETIC FIXTURE] example-org/risk-sdk: requirements.txt",
+    "text": "scikit-learn==1.4.2\nlangchain>=0.2.0\nopenai==1.30.0",
+    "snapshot_path": "V-002/snapshots/fixture-repos-sdk-requirements.txt",
+    "meta": {
+      "synthetic": true,
+      "fixture_note": "Synthetic test data; not collected from any real source.",
+      "evidence_caveat": "A dependency in a public repository may belong to samples, tooling or internal projects; it is not proof that the library is used in a service delivered to Meridian.",
+      "collector": "m3/1.0-fixture",
+      "org": "example-org",
+      "repo": "risk-sdk",
+      "path": "requirements.txt",
+      "branch": "main",
+      "manifest_type": "requirements.txt",
+      "matched_packages": [
+        "langchain",
+        "openai",
+        "scikit-learn"
+      ],
+      "is_example_path": false,
+      "evidence_class": "capability_dependency"
+    }
+  },
+  {
+    "doc_id": "V-002-FILINGS-97b0f794ebe6",
+    "vendor_id": "V-002",
+    "source_type": "FILINGS",
+    "url": "https://fixtures.invalid/V-002/filings/chunk-1",
+    "fetched_at": "2026-10-09T09:00:00Z",
+    "http_status": 200,
+    "content_hash": "19f6d20359d63487e6f60b5ec5557783783708a00200d5b69732f3b7a9768ab5",
+    "title": "[SYNTHETIC FIXTURE] 10-K excerpt 1 of 2",
+    "text": "Our clients depend on the availability of our platforms. We use machine learning models to detect anomalous payment activity across our processing systems. These models are trained on historical transaction data. We review model outputs regularly. Regulators are increasing scrutiny of automated decision-making.",
+    "snapshot_path": "V-002/snapshots/fixture-filings-chunk-1.txt",
+    "meta": {
+      "synthetic": true,
+      "fixture_note": "Synthetic test data; not collected from any real source.",
+      "evidence_caveat": "Statements in regulatory filings are corporate disclosures (often general or risk-factor language); they are not proof that AI is used in a specific service delivered to Meridian.",
+      "collector": "m3/1.0-fixture",
+      "form": "10-K",
+      "accession": "0000000000-26-000001",
+      "item": "Item 1. Business",
+      "matched_terms": [
+        "machine learning"
+      ],
+      "evidence_class": "regulatory_disclosure"
+    }
+  },
+  {
+    "doc_id": "V-002-FILINGS-b52b6279769e",
+    "vendor_id": "V-002",
+    "source_type": "FILINGS",
+    "url": "https://fixtures.invalid/V-002/filings/chunk-2",
+    "fetched_at": "2026-10-09T09:00:00Z",
+    "http_status": 200,
+    "content_hash": "e1a7da42600074152a16e0c2dae81990694ac994c3897b2d97cea4820a27b2cc",
+    "title": "[SYNTHETIC FIXTURE] 10-K excerpt 2 of 2",
+    "text": "Competition is intense. New technologies such as generative AI may change client expectations. We may not successfully adopt these technologies. Failure to do so could harm our business. Our risk management framework addresses emerging technology risk.",
+    "snapshot_path": "V-002/snapshots/fixture-filings-chunk-2.txt",
+    "meta": {
+      "synthetic": true,
+      "fixture_note": "Synthetic test data; not collected from any real source.",
+      "evidence_caveat": "Statements in regulatory filings are corporate disclosures (often general or risk-factor language); they are not proof that AI is used in a specific service delivered to Meridian.",
+      "collector": "m3/1.0-fixture",
+      "form": "10-K",
+      "accession": "0000000000-26-000001",
+      "item": "Item 1A. Risk Factors",
+      "matched_terms": [
+        "generative ai"
+      ],
+      "evidence_class": "regulatory_disclosure"
+    }
+  }
+]

@@ -12,8 +12,14 @@ __pycache__/
 Meridian_Vendor_Input.xlsx
 Case Study Brief.pdf
 
-# Cached vendor data, evidence and generated results
+# Cached vendor data, evidence and generated result
+# Ignore runtime caches by default
 cache/
+
+# Track deterministic synthetic M3 test fixtures
+!radar/fixtures/m3/cache/
+!radar/fixtures/m3/cache/**
+
 cache_*/
 outputs/
 data/labels*.csv

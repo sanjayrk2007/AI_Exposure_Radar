@@ -1,0 +1,28 @@
+[
+  {
+    "doc_id": "V-003-MANUAL-568d0686d97e",
+    "vendor_id": "V-003",
+    "source_type": "MANUAL",
+    "url": "https://fixtures.invalid/V-003/exec-post",
+    "fetched_at": "2026-10-08T00:00:00Z",
+    "http_status": 200,
+    "content_hash": "267c321571f2ece542cfc0c4285f8b5a3f79b2d9ba7350acaa03a3279e78a076",
+    "title": "[SYNTHETIC FIXTURE] Manual evidence (primary): fixtures.invalid",
+    "text": "Our team has rolled out an assistant that drafts customer notices and summarises case notes for our operations staff.",
+    "snapshot_path": "V-003/snapshots/manual-V-003-MANUAL-568d0686d97e.txt",
+    "meta": {
+      "source_class": "primary",
+      "captured_at": "2026-10-08T00:00:00Z",
+      "url_as_entered": "https://fixtures.invalid/V-003/exec-post",
+      "screenshot_path": "",
+      "retrieval_method": "analyst_manual_capture",
+      "http_status_nominal": true,
+      "submitted_at": "2026-10-12T23:47:50Z",
+      "synthetic": true,
+      "evidence_caveat": "Analyst-submitted evidence; the text was pasted by an analyst and has not been independently re-fetched by the tool.",
+      "collector": "m3/1.0",
+      "text_snapshot_path": "V-003/snapshots/manual-V-003-MANUAL-568d0686d97e.txt",
+      "fixture_note": "Synthetic test data; not collected from any real source."
+    }
+  }
+]

@@ -1,0 +1,23 @@
+[
+  {
+    "vendor_id": "V-005",
+    "source_type": "CAREERS",
+    "status": "OK",
+    "pages_fetched": 3,
+    "note": "careers page https://fixtures.invalid/V-005/careers; ATS detected: lever; read via public lever job-board feed; 1 postings seen, 1 technical/data roles (1 mention AI terms), 1 documents kept"
+  },
+  {
+    "vendor_id": "V-005",
+    "source_type": "REPOS",
+    "status": "EMPTY",
+    "pages_fetched": 5,
+    "note": "organisation 'example-org' accepted (organisation name equals vendor name); 7 repos scanned; 5 manifests read; no AI libraries found in public dependency manifests"
+  },
+  {
+    "vendor_id": "V-005",
+    "source_type": "FILINGS",
+    "status": "OK",
+    "pages_fetched": 3,
+    "note": "synthetic filer; 1 keyword-in-context excerpts around AI terms"
+  }
+]

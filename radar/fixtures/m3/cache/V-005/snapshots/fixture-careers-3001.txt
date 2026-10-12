@@ -1,0 +1,4 @@
+SYNTHETIC FIXTURE - not real vendor evidence
+
+Machine Learning Engineer, Payments Analytics
+Develop predictive model features for payment risk analytics using Python and gradient boosting. Collaborate with data scientists on model validation.

@@ -1,0 +1,55 @@
+[
+  {
+    "doc_id": "V-005-CAREERS-c6930e8dcadc",
+    "vendor_id": "V-005",
+    "source_type": "CAREERS",
+    "url": "https://fixtures.invalid/V-005/careers/3001",
+    "fetched_at": "2026-10-09T09:00:00Z",
+    "http_status": 200,
+    "content_hash": "34b1be5cf3ba3cc055cacec3d13a8a8d78eb455e9b2b1a0c0b47b7089daa6fbc",
+    "title": "[SYNTHETIC FIXTURE] Machine Learning Engineer, Payments Analytics",
+    "text": "Machine Learning Engineer, Payments Analytics\nDevelop predictive model features for payment risk analytics using Python and gradient boosting. Collaborate with data scientists on model validation.",
+    "snapshot_path": "V-005/snapshots/fixture-careers-3001.txt",
+    "meta": {
+      "synthetic": true,
+      "fixture_note": "Synthetic test data; not collected from any real source.",
+      "evidence_caveat": "Job postings show capability and intent, not deployment: a posting that mentions AI is not proof that AI is used in a service delivered to Meridian.",
+      "collector": "m3/1.0-fixture",
+      "ats": "greenhouse",
+      "job_id": "3001",
+      "department": "Engineering",
+      "location": "Remote",
+      "ai_terms": [
+        "machine learning",
+        "predictive model"
+      ],
+      "is_technical_role": true,
+      "evidence_class": "capability_and_intent"
+    }
+  },
+  {
+    "doc_id": "V-005-FILINGS-2c6a139a473b",
+    "vendor_id": "V-005",
+    "source_type": "FILINGS",
+    "url": "https://fixtures.invalid/V-005/filings/chunk-1",
+    "fetched_at": "2026-10-09T09:00:00Z",
+    "http_status": 200,
+    "content_hash": "62128da6483b68a6cc83f8c9aba2640334010c34b15502b4fcbeadae159c6ae3",
+    "title": "[SYNTHETIC FIXTURE] 10-K excerpt 1 of 1",
+    "text": "We operate a global technology and control environment. Our teams apply artificial intelligence to improve operational efficiency. Governance committees oversee the use of these tools. Use cases are reviewed before deployment. Third-party model providers are subject to our vendor risk process.",
+    "snapshot_path": "V-005/snapshots/fixture-filings-chunk-1.txt",
+    "meta": {
+      "synthetic": true,
+      "fixture_note": "Synthetic test data; not collected from any real source.",
+      "evidence_caveat": "Statements in regulatory filings are corporate disclosures (often general or risk-factor language); they are not proof that AI is used in a specific service delivered to Meridian.",
+      "collector": "m3/1.0-fixture",
+      "form": "10-K",
+      "accession": "0000000000-26-000002",
+      "item": "Item 1. Business",
+      "matched_terms": [
+        "artificial intelligence"
+      ],
+      "evidence_class": "regulatory_disclosure"
+    }
+  }
+]

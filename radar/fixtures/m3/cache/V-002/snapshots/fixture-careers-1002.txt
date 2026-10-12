@@ -1,0 +1,4 @@
+SYNTHETIC FIXTURE - not real vendor evidence
+
+Applied AI Engineer, Document Processing
+Design retrieval-augmented generation services using large language model APIs for document summarisation. Experience with embeddings and vector databases is required.

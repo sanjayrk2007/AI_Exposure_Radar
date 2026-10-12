@@ -1,0 +1,23 @@
+[
+  {
+    "vendor_id": "V-001",
+    "source_type": "CAREERS",
+    "status": "EMPTY",
+    "pages_fetched": 1,
+    "note": "no careers page found (homepage links and common paths returned nothing); a missing page is a finding, not a failure"
+  },
+  {
+    "vendor_id": "V-001",
+    "source_type": "REPOS",
+    "status": "NOT_APPLICABLE",
+    "pages_fetched": 0,
+    "note": "no public GitHub organisation clearly matches this vendor (accepted only on website/name match), so repositories were skipped"
+  },
+  {
+    "vendor_id": "V-001",
+    "source_type": "FILINGS",
+    "status": "NOT_APPLICABLE",
+    "pages_fetched": 1,
+    "note": "no SEC registrant with this exact company name in EDGAR's company list; treated as a non-filer"
+  }
+]

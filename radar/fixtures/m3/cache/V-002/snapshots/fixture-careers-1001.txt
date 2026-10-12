@@ -1,0 +1,4 @@
+SYNTHETIC FIXTURE - not real vendor evidence
+
+Senior Machine Learning Engineer, Fraud
+You will build and deploy machine learning models that score card transactions for fraud. We use PyTorch and Python. You will own model monitoring and retraining pipelines.

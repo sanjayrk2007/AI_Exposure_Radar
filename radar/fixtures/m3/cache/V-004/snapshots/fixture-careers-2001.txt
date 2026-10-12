@@ -1,0 +1,4 @@
+SYNTHETIC FIXTURE - not real vendor evidence
+
+Data Engineer
+Build ETL pipelines that consolidate advisor commission data. Python, SQL and cloud data warehouses. Nothing in this role involves AI.

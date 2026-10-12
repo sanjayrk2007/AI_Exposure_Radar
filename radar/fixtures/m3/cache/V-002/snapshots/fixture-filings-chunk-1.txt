@@ -1,0 +1,3 @@
+SYNTHETIC FIXTURE - not real vendor evidence
+
+Our clients depend on the availability of our platforms. We use machine learning models to detect anomalous payment activity across our processing systems. These models are trained on historical transaction data. We review model outputs regularly. Regulators are increasing scrutiny of automated decision-making.

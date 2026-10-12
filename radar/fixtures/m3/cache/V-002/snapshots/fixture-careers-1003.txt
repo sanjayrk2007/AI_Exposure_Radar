@@ -1,0 +1,4 @@
+SYNTHETIC FIXTURE - not real vendor evidence
+
+Staff Platform Engineer
+Operate the Kubernetes platform that hosts our core processing services. Strong Go and Linux skills required.
