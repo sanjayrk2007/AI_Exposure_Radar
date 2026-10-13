@@ -104,8 +104,16 @@ def _sitemap_urls(website):
     return urls
 
 
+def _with_scheme(website):
+    """Vendor sheets often hold bare domains ("www.example.com"); assume https."""
+    website = (website or "").strip()
+    if website and "://" not in website:
+        website = "https://" + website.lstrip("/")
+    return website
+
+
 def discover_urls(website, max_pages=20, max_depth=2):
-    website = _normalize_url(website)
+    website = _normalize_url(_with_scheme(website))
     if not website:
         return []
 
