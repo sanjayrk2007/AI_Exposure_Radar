@@ -146,11 +146,12 @@ def test_render_how_using_translates_business_categories():
     )
 
     assert "fraud detection" in result
-    assert "Transaction fraud detection" in result
-    assert "Payment processing" in result
+    assert "Transaction fraud detection" not in result
+    assert "Payment processing" not in result
+    assert "remain unverified" in result
     assert "future_oriented_terms" not in result
     assert "PyTorch" not in result
-    assert "does not by itself confirm production deployment" in result
+    assert "whether it is used in production, remain unverified" in result
 
 
 def test_render_how_using_handles_detection_only_categories():

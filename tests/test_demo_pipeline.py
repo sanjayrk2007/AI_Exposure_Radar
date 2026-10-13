@@ -397,8 +397,10 @@ def test_export_populates_m5_fields_and_preserves_vendor_inputs(tmp_path):
     assert sheet["N6"].value and "Critical" in sheet["N6"].value
     assert sheet["O6"].value == outcome.verdict.ai_usage
     assert TECH in sheet["P6"].value
-    assert "Transaction fraud detection" in sheet["Q6"].value
-    assert "Payment processing" in sheet["Q6"].value
+    assert "fraud detection" in sheet["Q6"].value
+    assert "remain unverified" in sheet["Q6"].value
+    assert "Transaction fraud detection" not in sheet["Q6"].value
+    assert "Payment processing" not in sheet["Q6"].value
     assert sheet["R6"].value is not None
     assert sheet["S6"].value == "High"
     assert "sensitive payment data" in sheet["T6"].value

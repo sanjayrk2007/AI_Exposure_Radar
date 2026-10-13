@@ -385,7 +385,9 @@ def test_template_rendering_integrity(vendor_fixtures: dict[str, VendorProfile])
         # 4. Hedged use-case narrative
         how_text = render_how_using(vendor.service, vendor.process, verdict.use_cases)
         assert isinstance(how_text, str)
-        assert vendor.service in how_text
+        assert "transaction scoring" in how_text
+        assert "remain unverified" in how_text
+        assert vendor.service not in how_text
 
 
 def test_action_timeframes():

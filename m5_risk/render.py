@@ -66,20 +66,12 @@ def render_how_using(service: str, process: str, use_cases: list) -> str:
             "application for this vendor. Further confirmation is required."
         )
 
-    service_text = (
-        service.strip() if service and service.strip()
-        else "the vendor's services"
-    )
-    process_text = (
-        process.strip() if process and process.strip()
-        else "the relevant business process"
-    )
     applications = ", ".join(readable)
 
     return (
-        f"Public evidence identifies AI-related indicators associated with "
-        f"{applications} in the context of {service_text}, which supports "
-        f"{process_text}. This does not by itself confirm production deployment."
+        f"Public evidence mentions {applications}, indicating AI-related "
+        f"activity. Its connection to the vendor's services and business "
+        f"process, and whether it is used in production, remain unverified."
     )
 
 def render_depth_applied(c: CriticalityResult, pages_fetched: int, sources_consulted: str, status_notes: str, coverage: float, plan_dict: dict) -> str:
