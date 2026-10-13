@@ -12,7 +12,8 @@ def doc(doc_id="D1", source_type="DOCS", text="OpenAI uses an API for fraud dete
 def signal(signal_id, source_type, tag, *, verified=True, vendor_id="V-MOCK", providers=None, category="fraud_detection",
            specificity=0.8):
     return Signal(signal_id, vendor_id, "D-" + signal_id, source_type,
-                  "https://example.invalid/" + signal_id, "mock excerpt", 0, 12,
+                  "https://example.invalid/" + signal_id,
+                  "OpenAI uses an API for fraud detection.", 0, 12,
                   category, providers or [], specificity, 4.0, 3.2, tag, verified, "RULE")
 
 

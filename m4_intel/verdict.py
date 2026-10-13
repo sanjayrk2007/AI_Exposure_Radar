@@ -9,7 +9,11 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from m4_intel.specificity import DEFAULT_WEIGHTS_PATH, load_source_weights
+from m4_intel.specificity import (
+    DEFAULT_WEIGHTS_PATH,
+    load_source_weights,
+    map_use_cases,
+)
 from radar.contracts.models import VendorVerdict
 
 
@@ -255,7 +259,11 @@ def generate_verdict(
         coverage=coverage,
         signal_ids=[_field(signal, "signal_id") for signal in verified],
         providers=_unique_values(verified, "providers"),
-        use_cases=_unique_values(verified, "category"),
+        use_cases=list(dict.fromkeys(
+            use_case
+            for signal in verified
+            for use_case in map_use_cases(_field(signal, "excerpt", ""))
+        )),
         reasons=reasons,
     )
 
