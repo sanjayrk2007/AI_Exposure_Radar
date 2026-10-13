@@ -24,6 +24,9 @@ _CELL_TAGS = {"td", "th"}
 _DROP_TAGS = ("script", "style", "noscript", "svg", "template", "iframe", "head")
 
 
+_XML_ILLEGAL_CHAR_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff]")
+
+
 def normalize_ws(text: str) -> str:
     """Collapse runs of spaces/tabs; keep single newlines; squeeze blank lines."""
     text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\xa0", " ")
@@ -45,6 +48,7 @@ def normalize_ws(text: str) -> str:
 def _parse_html(html: str) -> Optional[lxml.html.HtmlElement]:
     if not html or not html.strip():
         return None
+    html = _XML_ILLEGAL_CHAR_RE.sub("", html)
     try:
         return lxml.html.fromstring(html)
     except (etree.ParserError, etree.XMLSyntaxError, ValueError):
@@ -96,13 +100,13 @@ def _drop(el: Any) -> None:
     parent = el.getparent()
     if parent is None:
         return
-    tail = el.tail
+    tail = _XML_ILLEGAL_CHAR_RE.sub("", el.tail or "")
     if tail:
         prev = el.getprevious()
         if prev is not None:
-            prev.tail = (prev.tail or "") + tail
+            prev.tail = _XML_ILLEGAL_CHAR_RE.sub("", (prev.tail or "") + tail)
         else:
-            parent.text = (parent.text or "") + tail
+            parent.text = _XML_ILLEGAL_CHAR_RE.sub("", (parent.text or "") + tail)
     parent.remove(el)
 
 

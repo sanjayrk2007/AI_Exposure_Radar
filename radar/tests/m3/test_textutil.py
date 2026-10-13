@@ -53,3 +53,13 @@ def test_jsonld_graph_and_bad_json():
 def test_greenhouse_double_escaped_content():
     assert unescape_html_fragment("&lt;p&gt;Hello &amp;amp; welcome&lt;/p&gt;") == "Hello & welcome"
     assert unescape_html_fragment("") == ""
+
+
+def test_html_to_text_with_null_bytes_and_control_chars():
+    bad_html = "<div><!-- comment\x00 -->Hello\x00 world\x0c!\x08<script>drop\x00me</script><p>Tail\x0b text</p></div>"
+    text = html_to_text(bad_html)
+    assert "Hello world!" in text
+    assert "Tail text" in text
+    assert "\x00" not in text
+    assert "\x0c" not in text
+
