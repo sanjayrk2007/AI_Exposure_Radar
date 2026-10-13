@@ -134,3 +134,36 @@ def test_pipeline_rejects_invalid_mode():
 
     with pytest.raises(ValueError, match="mode"):
         run_vendor(vendor, mode="invalid")
+
+
+def test_render_how_using_translates_business_categories():
+    from m5_risk.render import render_how_using
+
+    result = render_how_using(
+        "Transaction fraud detection",
+        "Payment processing",
+        ["fraud detection", "future_oriented_terms", "PyTorch"],
+    )
+
+    assert "fraud detection" in result
+    assert "Transaction fraud detection" in result
+    assert "Payment processing" in result
+    assert "future_oriented_terms" not in result
+    assert "PyTorch" not in result
+    assert "does not by itself confirm production deployment" in result
+
+
+def test_render_how_using_handles_detection_only_categories():
+    from m5_risk.render import render_how_using
+
+    result = render_how_using(
+        "Vendor service",
+        "Core operations",
+        ["providers", "frameworks", "hype_terms", "future_oriented_terms"],
+    )
+
+    assert "providers" not in result
+    assert "frameworks" not in result
+    assert "hype_terms" not in result
+    assert "future_oriented_terms" not in result
+    assert "does not establish a specific AI application" in result

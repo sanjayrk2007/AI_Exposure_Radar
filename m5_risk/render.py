@@ -38,13 +38,43 @@ def render_recommended_action(risk_class: str) -> str:
     return tmpl["action"]["recommended"].format(timeframe=tf)
 
 def render_how_using(service: str, process: str, use_cases: list) -> str:
-    tmpl = _load_templates()
-    uc_str = ", ".join(use_cases) if use_cases else "machine learning models"
-    return tmpl["use_case"]["hedged"].format(
-        use_cases=uc_str,
-        service=service or "vendor core software",
-        process=process or "operational pipelines"
+    """Render readable, cautious AI-use context without exposing detector labels."""
+    descriptions = {
+        "fraud detection": "fraud detection",
+        "transaction scoring": "transaction scoring",
+        "document classification": "document classification",
+        "chatbot": "chatbot functionality",
+        "virtual assistant": "virtual-assistant functionality",
+        "summarisation": "summarisation",
+        "summarization": "summarisation",
+        "auto-drafting": "automated drafting",
+        "forecasting": "forecasting",
+    }
+
+    readable = []
+    for item in use_cases or []:
+        key = " ".join(str(item).strip().lower().replace("_", " ").replace("-", " ").split())
+        description = descriptions.get(key)
+        if description and description not in readable:
+            readable.append(description)
+
+    service_text = service.strip() if service and service.strip() else "the vendor's services"
+    process_text = process.strip() if process and process.strip() else "the relevant business process"
+
+    if readable:
+        applications = ", ".join(readable)
+        return (
+            f"Public evidence identifies AI-related indicators associated with "
+            f"{applications} in the context of {service_text}, which supports "
+            f"{process_text}. This does not by itself confirm production deployment."
+        )
+
+    return (
+        f"Public sources contain AI-related indicators relevant to {service_text} "
+        f"and {process_text}, but the collected evidence does not establish a "
+        f"specific AI application or confirm production deployment."
     )
+
 
 def render_depth_applied(c: CriticalityResult, pages_fetched: int, sources_consulted: str, status_notes: str, coverage: float, plan_dict: dict) -> str:
     tmpl = _load_templates()
