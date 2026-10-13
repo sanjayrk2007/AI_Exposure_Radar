@@ -304,6 +304,108 @@ def test_export_refuses_same_path_and_preserves_provided_cells(tmp_path):
     assert all(row[0] != "V-000" for row in rows)
 
 
+
+def test_export_populates_m5_fields_and_preserves_vendor_inputs(tmp_path):
+    from radar.contracts.models import (
+        CriticalityResult, DepthPlan, RiskAssessment, VendorProfile,
+    )
+    from radar.export import VendorResult
+
+    source = write_input_workbook(tmp_path / "input.xlsx")
+    original = load_workbook(source)
+    original_sheet = original["Vendor Inventory"]
+    original_vendor_cells = [
+        original_sheet.cell(row=6, column=c).value for c in range(2, 12)
+    ]
+    original_example = [
+        original_sheet.cell(row=5, column=c).value for c in range(1, 23)
+    ]
+
+    docs = [make_doc("D1", "TRUST", TECH)]
+    reports = [SourceReport("V-001", "TRUST", "OK", 2, "ok")]
+    outcome = analyse_detailed(
+        {"vendor_id": "V-001", "Public Website": SITE},
+        docs,
+        reports,
+        ["TRUST"],
+        use_model=False,
+        strict_integrity=True,
+    )
+
+    profile = VendorProfile(
+        vendor_id="V-001",
+        name="Vendor 1",
+        description="Fraud detection service",
+        service="Transaction fraud detection",
+        category="Technology",
+        website=SITE,
+        process="Payment processing",
+        dependency="High",
+        data_class="Confidential",
+        data_volume="High",
+    )
+    result = VendorResult(
+        vendor_id="V-001",
+        verdict=outcome.verdict,
+        signals=outcome.signals,
+        reports=reports,
+        documents=docs,
+        criticality=CriticalityResult(
+            vendor_id="V-001",
+            tier="Critical",
+            scores={"D": 4, "S": 5, "P": 3, "R": 4, "V": 5},
+            floors_applied=["Critical process floor"],
+            rationale="Supports a critical payment process.",
+        ),
+        depth_plan=DepthPlan(
+            vendor_id="V-001",
+            tier="Critical",
+            sources=["TRUST", "DOCS"],
+            max_pages=20,
+            max_depth=3,
+            stop_rule="Stop when sufficient evidence is collected.",
+        ),
+        risk=RiskAssessment(
+            vendor_id="V-001",
+            risk_class="High",
+            rationale="AI processes sensitive payment data.",
+            recommended_action="Review controls and obtain assurance evidence.",
+        ),
+        vendor_profile=profile,
+        assessed_by="Integration Test",
+        assessed_at="2026-10-13T00:00:00+00:00",
+    )
+
+    output = export_workbook(
+        source, tmp_path / "results.xlsx", {"V-001": result}
+    )
+    workbook = load_workbook(output)
+    sheet = workbook["Vendor Inventory"]
+
+    assert sheet["L6"].value == "Critical"
+    assert "Supports a critical payment process" in sheet["M6"].value
+    assert sheet["N6"].value and "Critical" in sheet["N6"].value
+    assert sheet["O6"].value == outcome.verdict.ai_usage
+    assert TECH in sheet["P6"].value
+    assert "Transaction fraud detection" in sheet["Q6"].value
+    assert "Payment processing" in sheet["Q6"].value
+    assert sheet["R6"].value is not None
+    assert sheet["S6"].value == "High"
+    assert "sensitive payment data" in sheet["T6"].value
+    assert "obtain assurance evidence" in sheet["U6"].value
+    assert sheet["V6"].value == (
+        "Integration Test / 2026-10-13T00:00:00+00:00"
+    )
+
+    # Original vendor inputs and the example row must remain unchanged.
+    assert [
+        sheet.cell(row=6, column=c).value for c in range(2, 12)
+    ] == original_vendor_cells
+    assert [
+        sheet.cell(row=5, column=c).value for c in range(1, 23)
+    ] == original_example
+
+
 def test_run_demo_cache_mode_isolates_failures_and_is_reproducible(tmp_path):
     source = write_input_workbook(tmp_path / "input.xlsx")
     cache = tmp_path / "cache"
