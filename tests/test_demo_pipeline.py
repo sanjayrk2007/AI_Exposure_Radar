@@ -308,6 +308,7 @@ def test_export_refuses_same_path_and_preserves_provided_cells(tmp_path):
 def test_export_populates_m5_fields_and_preserves_vendor_inputs(tmp_path):
     from radar.contracts.models import (
         CriticalityResult, DepthPlan, RiskAssessment, VendorProfile,
+        VendorVerdict,
     )
     from radar.export import VendorResult
 
@@ -346,7 +347,16 @@ def test_export_populates_m5_fields_and_preserves_vendor_inputs(tmp_path):
     )
     result = VendorResult(
         vendor_id="V-001",
-        verdict=outcome.verdict,
+        verdict=VendorVerdict(
+            vendor_id="V-001",
+            ai_usage=outcome.verdict.ai_usage,
+            strength=outcome.verdict.strength,
+            coverage=outcome.verdict.coverage,
+            signal_ids=outcome.verdict.signal_ids,
+            providers=outcome.verdict.providers,
+            use_cases=["fraud detection"],
+            reasons=outcome.verdict.reasons,
+        ),
         signals=outcome.signals,
         reports=reports,
         documents=docs,
