@@ -1,20 +1,40 @@
 
-from contracts.models import DepthPlan, VendorProfile
-from m2_web import collector
-from m2_web.collector import collect_web
+from radar.contracts.models import DepthPlan, VendorProfile
+from radar.m2_web import collector
+from radar.m2_web.collector import collect_web
 
 
 def make_vendor(website="https://example.com"):
     return VendorProfile(
         vendor_id="example",
         name="Example",
+        description="Example vendor",
+        service="Example service",
+        category="SaaS",
         website=website,
+        process="Example process",
+        dependency="Medium",
+        data_class="Internal",
+        data_volume="Low",
     )
+
+
+def make_plan(**overrides):
+    values = dict(
+        vendor_id="example",
+        tier="Medium",
+        sources=["TRUST", "DOCS", "WEB"],
+        max_pages=20,
+        max_depth=2,
+        stop_rule="page_budget",
+    )
+    values.update(overrides)
+    return DepthPlan(**values)
 
 
 def test_collector_returns_documents_and_reports(monkeypatch):
     vendor = make_vendor()
-    plan = DepthPlan(vendor_id="example")
+    plan = make_plan()
 
     monkeypatch.setattr(
         collector,
@@ -57,7 +77,7 @@ def test_collector_returns_documents_and_reports(monkeypatch):
 
 def test_collector_missing_website_reports_error():
     vendor = make_vendor("")
-    plan = DepthPlan(vendor_id="example")
+    plan = make_plan()
 
     documents, reports = collect_web(vendor, plan)
 
@@ -68,7 +88,7 @@ def test_collector_missing_website_reports_error():
 
 def test_collector_blocked_page_reports_blocked(monkeypatch):
     vendor = make_vendor()
-    plan = DepthPlan(vendor_id="example")
+    plan = make_plan()
 
     monkeypatch.setattr(
         collector,
@@ -100,7 +120,7 @@ def test_collector_blocked_page_reports_blocked(monkeypatch):
 
 def test_collector_handles_discovery_failure(monkeypatch):
     vendor = make_vendor()
-    plan = DepthPlan(vendor_id="example")
+    plan = make_plan()
 
     def fail_discovery(*args, **kwargs):
         raise RuntimeError("Test discovery failure")
@@ -116,7 +136,7 @@ def test_collector_handles_discovery_failure(monkeypatch):
 
 def test_collector_skips_duplicate_urls(monkeypatch):
     vendor = make_vendor()
-    plan = DepthPlan(vendor_id="example")
+    plan = make_plan()
     calls = []
 
     monkeypatch.setattr(
@@ -152,7 +172,7 @@ def test_collector_skips_duplicate_urls(monkeypatch):
 
 def test_collector_collects_pdf_document(monkeypatch):
     vendor = make_vendor()
-    plan = DepthPlan(vendor_id="example")
+    plan = make_plan()
     pdf_bytes = b"%PDF-1.4 mock pdf bytes"
 
     monkeypatch.setattr(
@@ -202,12 +222,7 @@ def test_collector_collects_pdf_document(monkeypatch):
 
 def test_collector_respects_page_budget(monkeypatch):
     vendor = make_vendor()
-    plan = DepthPlan(
-        vendor_id="example",
-        sources=["TRUST", "DOCS", "WEB"],
-        max_pages=1,
-        max_depth=2,
-    )
+    plan = make_plan(max_pages=1)
 
     fetched_urls = []
 

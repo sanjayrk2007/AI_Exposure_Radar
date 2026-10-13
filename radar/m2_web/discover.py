@@ -7,10 +7,10 @@ from xml.etree import ElementTree
 import yaml
 from bs4 import BeautifulSoup
 
-from m2_web.fetcher import fetch_url
+from radar.m2_web.fetcher import fetch_url
 
 
-CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "lexicon.yaml"
+CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "m2_discovery.yaml"
 
 COMMON_PATHS = [
     "/trust",

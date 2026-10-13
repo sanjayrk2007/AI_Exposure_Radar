@@ -4,8 +4,8 @@ from io import BytesIO
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 
-from contracts.models import DepthPlan, VendorProfile
-from m2_web.parse import parse_page
+from radar.contracts.models import DepthPlan, VendorProfile
+from radar.m2_web.parse import parse_page
 
 
 def create_pdf():
@@ -44,7 +44,14 @@ def test_vendor_profile():
     vendor = VendorProfile(
         vendor_id="example",
         name="Example",
+        description="Example vendor",
+        service="Example service",
+        category="SaaS",
         website="https://example.com",
+        process="Example process",
+        dependency="Medium",
+        data_class="Internal",
+        data_volume="Low",
     )
 
     assert vendor.vendor_id == "example"
@@ -52,8 +59,18 @@ def test_vendor_profile():
 
 
 def test_depth_plan():
-    plan = DepthPlan(vendor_id="example")
+    from m5_risk.criticality import assess_criticality
+    from m5_risk.planner import plan_depth
 
+    vendor = VendorProfile(
+        vendor_id="example", name="Example", description="Example vendor",
+        service="Example service", category="SaaS", website="https://example.com",
+        process="Example process", dependency="Medium", data_class="Internal",
+        data_volume="Low",
+    )
+    plan = plan_depth(assess_criticality(vendor), vendor)
+
+    assert isinstance(plan, DepthPlan)
     assert plan.max_pages > 0
     assert plan.max_depth >= 0
     assert "TRUST" in plan.sources

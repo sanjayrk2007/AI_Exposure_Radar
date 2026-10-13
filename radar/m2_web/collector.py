@@ -3,10 +3,10 @@ import hashlib
 import uuid
 from urllib.parse import urlparse
 
-from contracts.models import Document, SourceReport
-from m2_web.discover import discover_urls
-from m2_web.fetcher import fetch_url
-from m2_web.parse import parse_page
+from radar.contracts.models import Document, SourceReport
+from radar.m2_web.discover import discover_urls
+from radar.m2_web.fetcher import fetch_url
+from radar.m2_web.parse import parse_page
 
 
 def collect_web(vendor, plan):

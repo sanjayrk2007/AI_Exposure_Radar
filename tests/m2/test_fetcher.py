@@ -2,7 +2,7 @@
 import hashlib
 import json
 
-from m2_web import fetcher
+from radar.m2_web import fetcher
 
 
 def test_cache_mode_reads_saved_response(tmp_path, monkeypatch):
