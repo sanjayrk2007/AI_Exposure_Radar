@@ -291,8 +291,13 @@ def test_export_refuses_same_path_and_preserves_provided_cells(tmp_path):
     assert out_sheet["O6"].value == "Yes"
     assert TECH in out_sheet["P6"].value and "retrieved 2026-10-11" in out_sheet["P6"].value
     assert out_sheet["O7"].value is None
-    for column in (12, 13, 14, 19, 20, 21, 22):
+    # M5-dependent fields remain blank when no M5 results are supplied.
+    for column in (12, 13, 14, 19, 20, 21):
         assert out_sheet.cell(row=6, column=column).value is None
+
+    # Assessment metadata is populated by the exporter.
+    assert "AI Exposure Radar team" in out_sheet["V6"].value
+    assert "/" in out_sheet["V6"].value
     log = out_book["Evidence Log"]
     rows = list(log.iter_rows(min_row=2, values_only=True))
     assert rows and all(row[19] == "RULE_PROPOSED_UNREVIEWED" and row[20] in (None, "") for row in rows)

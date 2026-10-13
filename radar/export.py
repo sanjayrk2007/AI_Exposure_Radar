@@ -14,17 +14,30 @@ from typing import Any, Mapping, Sequence
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font
 
-from radar.contracts.models import Signal, SourceReport, VendorVerdict
+from datetime import datetime, timezone
+
+from m5_risk.render import render_depth_applied, render_how_using
+from radar.contracts.models import (
+    CriticalityResult, DepthPlan, RiskAssessment,
+    Signal, SourceReport, VendorProfile, VendorVerdict,
+)
 
 SHEET_NAME = "Vendor Inventory"
 HEADER_ROW = 4
 EXAMPLE_VENDOR_ID = "V-000"
 FIRST_PROVIDED_COLUMN, LAST_PROVIDED_COLUMN = 2, 11
 FILLED_COLUMNS = {
+    12: "Criticality Tier",
+    13: "Criticality Rationale",
+    14: "Assessment Depth Applied",
     15: "AI Usage Detected",
     16: "Evidence Description",
     17: "How Vendor May Be Using AI",
     18: "Named AI Sub-processors",
+    19: "AI Security Risk Classification",
+    20: "Risk Rationale",
+    21: "Recommended Action",
+    22: "Assessed By / Date",
 }
 MAX_EVIDENCE_EXCERPTS = 3
 PROPOSAL_STATUS = {
@@ -51,6 +64,12 @@ class VendorResult:
     ambiguous: dict[str, list[str]] = field(default_factory=dict)
     llm_proposed: dict[str, dict[str, Any]] = field(default_factory=dict)
     error: str = ""
+    criticality: CriticalityResult | None = None
+    depth_plan: DepthPlan | None = None
+    risk: RiskAssessment | None = None
+    vendor_profile: VendorProfile | None = None
+    assessed_by: str = "AI Exposure Radar team"
+    assessed_at: str = ""
 
 
 def _sha256(path: Path) -> str:
@@ -139,6 +158,75 @@ def providers_text(result: VendorResult) -> str:
     return "No named AI subprocessor explicitly verified in the collected evidence." + suffix
 
 
+
+def criticality_text(result: VendorResult) -> str:
+    """Format M5 criticality scores and floor audit trail."""
+    criticality = result.criticality
+    if criticality is None:
+        return ""
+    scores = criticality.scores
+    score_text = ", ".join(
+        f"{key}={scores[key]}" for key in ("D", "S", "P", "R", "V")
+        if key in scores
+    )
+    floors = ", ".join(criticality.floors_applied) or "None"
+    rationale = criticality.rationale.strip()
+    parts = [f"Tier: {criticality.tier}"]
+    if score_text:
+        parts.append(f"Scores: {score_text}")
+    parts.append(f"Floors applied: {floors}")
+    if rationale:
+        parts.append(rationale)
+    return ". ".join(parts)
+
+
+def depth_text(result: VendorResult) -> str:
+    """Summarize planned depth and observed source collection."""
+    plan = result.depth_plan
+    if plan is None:
+        return ""
+    reports = result.reports
+    sources_consulted = sorted({
+        report.source_type for report in reports
+        if report.status not in {"SKIPPED_BY_PLAN", "NOT_APPLICABLE"}
+    })
+    pages_fetched = sum(report.pages_fetched for report in reports)
+    status_notes = "; ".join(
+        f"{report.source_type}: {report.status}"
+        + (f" ({report.note})" if report.note else "")
+        for report in reports
+        if report.status != "OK"
+    ) or "No reported source failures"
+    try:
+        return render_depth_applied(
+            result.criticality,
+            pages_fetched,
+            ", ".join(sources_consulted) or "None",
+            status_notes,
+            result.verdict.coverage,
+            {
+                "max_pages": plan.max_pages,
+                "max_depth": plan.max_depth,
+                "sources": plan.sources,
+                "stop_rule": plan.stop_rule,
+            },
+        )
+    except (KeyError, AttributeError, TypeError):
+        return (
+            f"Tier {plan.tier}; budget {plan.max_pages} pages; depth "
+            f"{plan.max_depth}; planned sources: {', '.join(plan.sources)}; "
+            f"consulted: {', '.join(sources_consulted) or 'None'}; "
+            f"pages fetched: {pages_fetched}; coverage: "
+            f"{result.verdict.coverage:.3f}; stop rule: {plan.stop_rule}; "
+            f"{status_notes}"
+        )
+
+
+def assessed_stamp(result: VendorResult) -> str:
+    """Return the assessor and an ISO 8601 timestamp."""
+    stamp = result.assessed_at or datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return f"{result.assessed_by} / {stamp}"
+
 def _verify_unchanged(input_path: Path, output_path: Path) -> None:
     source = load_workbook(input_path, data_only=False)
     produced = load_workbook(output_path, data_only=False)
@@ -177,10 +265,25 @@ def export_workbook(input_path: str | Path, output_path: str | Path,
         if result is None:
             continue
         values = {
+            12: result.criticality.tier if result.criticality else "",
+            13: criticality_text(result),
+            14: depth_text(result),
             15: result.verdict.ai_usage,
             16: evidence_text(result),
-            17: usage_text(result),
+            17: (
+                render_how_using(
+                    result.vendor_profile.service if result.vendor_profile else "",
+                    result.vendor_profile.process if result.vendor_profile else "",
+                    result.verdict.use_cases,
+                )
+                if result.verdict.use_cases
+                else usage_text(result)
+            ),
             18: providers_text(result),
+            19: result.risk.risk_class if result.risk else "",
+            20: result.risk.rationale if result.risk else "",
+            21: result.risk.recommended_action if result.risk else "",
+            22: assessed_stamp(result),
         }
         for column, value in values.items():
             cell = sheet.cell(row=row, column=column, value=value)
@@ -228,7 +331,7 @@ def export_workbook(input_path: str | Path, output_path: str | Path,
     about.append(["Every excerpt was verified as an exact substring of the collected page text."])
     about.append(["A page statement is a vendor claim, not independent proof of how or whether a capability is deployed."])
     about.append(["Missing, blocked or failed sources lower coverage and never indicate that a vendor does not use AI."])
-    about.append(["Columns L to N and S to V were not assessed by this module."])
+    about.append(["Columns L–V are populated when the corresponding M5 results are supplied; blank M5 fields indicate unavailable results."])
     for note in notes:
         about.append([note])
 

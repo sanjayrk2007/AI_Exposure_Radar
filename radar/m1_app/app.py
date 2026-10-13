@@ -22,8 +22,9 @@ mode = st.radio("Collection mode", ["cache", "live"], horizontal=True, index=0)
 use_model = st.checkbox("Use M4 model where available", value=False)
 
 st.info(
-    "The current exporter fills columns O–R and adds Evidence Log, Coverage, "
-    "and Run Notes. Columns L–N and S–V are not assessed by this version."
+    "The exporter fills columns L–V when the corresponding assessment results "
+    "are available. Missing M5 results remain blank; review Evidence Log, Coverage, "
+    "and Run Notes before relying on conclusions."
 )
 
 if uploaded is not None:
@@ -78,6 +79,10 @@ if uploaded is not None:
                         ],
                         ambiguous=result.ambiguous,
                         llm_proposed=result.llm_proposed,
+                        criticality=result.criticality,
+                        depth_plan=result.depth_plan,
+                        risk=result.risk,
+                        vendor_profile=vendor,
                     )
 
                     display_rows.append({
@@ -141,7 +146,7 @@ if uploaded is not None:
                     notes=[
                         f"Collection mode: {mode}",
                         "M1 orchestration run; results are machine-proposed and not analyst-reviewed.",
-                        "L–N and S–V remain unassessed by the current exporter.",
+                        "M5 fields are populated when assessment results are available; blank fields indicate unavailable results.",
                     ],
                 )
                 st.session_state["m1_results"] = display_rows
