@@ -2,29 +2,47 @@
 
 from __future__ import annotations
 
+import sys
 import tempfile
 from pathlib import Path
+
+_ROOT = Path(__file__).resolve().parents[2]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 import streamlit as st
 from openpyxl import load_workbook
 
-from radar.contracts.models import RiskAssessment, SourceReport, VendorVerdict
+from radar.contracts.models import SourceReport, VendorVerdict
 from radar.export import VendorResult, export_workbook
+from radar.m1_app.dashboard import record_from_error, record_from_result, render_dashboard
 from radar.m1_app.excel_io import EXAMPLE_VENDOR_ID, read_vendor_profiles
 from radar.m1_app.pipeline import run_vendor
+from radar.m1_app.theme import inject_theme
 
 st.set_page_config(page_title="AI Exposure Radar", layout="wide")
-st.title("AI Exposure Radar")
-st.caption("Vendor AI exposure screening — machine-proposed findings require analyst review.")
+inject_theme()
 
-uploaded = st.file_uploader("Upload vendor inventory (.xlsx)", type=["xlsx"])
-mode = st.radio("Collection mode", ["cache", "live"], horizontal=True, index=0)
-use_model = st.checkbox("Use M4 model where available", value=False)
+st.markdown(
+    '<div class="hero"><div class="eyebrow">Vendor risk · AI exposure screening</div>'
+    '<div class="hero-title">AI Exposure Radar</div>'
+    '<div class="hero-sub">Screen a vendor inventory for evidence of AI use, rate the resulting risk, '
+    "and export an audit-ready workbook.</div></div>",
+    unsafe_allow_html=True,
+)
 
-st.info(
-    "The exporter fills columns L–V when the corresponding assessment results "
-    "are available. Missing M5 results remain blank; review Evidence Log, Coverage, "
-    "and Run Notes before relying on conclusions."
+input_col, option_col = st.columns([3, 2], gap="large")
+with input_col:
+    uploaded = st.file_uploader("Vendor inventory (.xlsx)", type=["xlsx"])
+with option_col:
+    mode = st.radio("Collection mode", ["cache", "live"], horizontal=True, index=0)
+    use_model = st.checkbox("Use M4 model where available", value=False)
+
+st.markdown(
+    '<div class="notice">Machine-proposed findings require analyst review. The exporter fills '
+    "columns L–V when assessment results are available; missing M5 results stay blank. "
+    "Review the Evidence Log, Coverage and Run Notes sheets before relying on conclusions.</div>",
+    unsafe_allow_html=True,
 )
 
 if uploaded is not None:
@@ -85,18 +103,7 @@ if uploaded is not None:
                         vendor_profile=vendor,
                     )
 
-                    display_rows.append({
-                        "Vendor ID": vendor.vendor_id,
-                        "Vendor": vendor.name,
-                        "Criticality": result.criticality.tier,
-                        "AI Usage": result.verdict.ai_usage,
-                        "Strength": result.verdict.strength,
-                        "Coverage": round(result.verdict.coverage * 100, 1),
-                        "Risk": result.risk.risk_class,
-                        "Documents": len(result.documents),
-                        "Signals": len(result.signals),
-                        "Status": "Completed",
-                    })
+                    display_rows.append(record_from_result(vendor, result))
 
                 except Exception as exc:
                     message = f"{type(exc).__name__}: {exc}"
@@ -123,18 +130,7 @@ if uploaded is not None:
                         ],
                         error=message,
                     )
-                    display_rows.append({
-                        "Vendor ID": vendor.vendor_id,
-                        "Vendor": vendor.name,
-                        "Criticality": "Not assessed",
-                        "AI Usage": "Inconclusive",
-                        "Strength": "None",
-                        "Coverage": 0.0,
-                        "Risk": "Not assessed",
-                        "Documents": 0,
-                        "Signals": 0,
-                        "Status": f"Error: {message}",
-                    })
+                    display_rows.append(record_from_error(vendor, message))
 
                 progress.progress((index + 1) / len(profiles))
 
@@ -151,19 +147,33 @@ if uploaded is not None:
                 )
                 st.session_state["m1_results"] = display_rows
                 st.session_state["m1_output"] = output_path.read_bytes()
+                st.session_state["m1_export_error"] = None
                 st.success("Run finished and Excel export created.")
             except Exception as exc:
+                st.session_state["m1_results"] = display_rows
+                st.session_state["m1_output"] = None
+                st.session_state["m1_export_error"] = str(exc)
                 st.error(f"Excel export failed: {exc}")
 
             status.empty()
 
 if "m1_results" in st.session_state:
-    st.subheader("Run results")
-    st.dataframe(st.session_state["m1_results"], use_container_width=True, hide_index=True)
-
-    st.download_button(
-        "Download results workbook",
-        data=st.session_state["m1_output"],
-        file_name="AI_Exposure_Radar_results.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    )
+    title_col, download_col = st.columns([4, 1], vertical_alignment="bottom")
+    title_col.markdown('<div class="section">Run results</div>', unsafe_allow_html=True)
+    if st.session_state.get("m1_export_error"):
+        download_col.button(
+            "Download workbook",
+            disabled=True,
+            use_container_width=True,
+            help=f"Excel export failed: {st.session_state['m1_export_error']}",
+        )
+    elif st.session_state.get("m1_output"):
+        download_col.download_button(
+            "Download workbook",
+            data=st.session_state["m1_output"],
+            file_name="AI_Exposure_Radar_results.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            type="primary",
+            use_container_width=True,
+        )
+    render_dashboard(st.session_state["m1_results"])
